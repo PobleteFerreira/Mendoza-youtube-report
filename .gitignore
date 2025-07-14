@@ -4,6 +4,7 @@ __pycache__/
 
 # Data files (CSV reports)
 data/*.csv
+!data/report_202507.csv
 
 # Node.js artifacts
 frontend/node_modules/
