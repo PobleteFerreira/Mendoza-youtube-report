@@ -2,9 +2,8 @@ name: YouTube Monthly Report
 
 on:
   schedule:
-    # Corre el primer día de cada mes a las 02:00 UTC
     - cron: '0 2 1 * *'
-  workflow_dispatch: # Permite ejecución manual desde GitHub Actions
+  workflow_dispatch:
 
 jobs:
   generate-report:
@@ -24,16 +23,19 @@ jobs:
       - name: Set up YOUTUBE_API_KEY
         env:
           YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
-        run: |
-          echo "YOUTUBE_API_KEY=${YOUTUBE_API_KEY}" > extractor/.env
+        run: echo "YOUTUBE_API_KEY=${YOUTUBE_API_KEY}" > extractor/.env
 
       - name: Run YouTube Report Script
         run: python extractor/youtube_report.py
+
+      - name: Get current year and month
+        id: date
+        run: echo "month=$(date +'%Y%m')" >> $GITHUB_OUTPUT
 
       - name: Commit and push report
         run: |
           git config --global user.email "actions@github.com"
           git config --global user.name "GitHub Actions"
-          git add data/report_*.csv
+          git add data/report_${{ steps.date.outputs.month }}.csv
           git commit -m "Automated monthly report [skip ci]" || echo "No changes to commit"
           git push
