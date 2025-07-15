@@ -56,7 +56,21 @@ try:
     plt.figure(figsize=(6, 4))
     plt.barh(top["Nombre"], top["Ratio"])
     plt.xlabel("Vistas por suscriptor")
-    plt.title(f"Ranking Streaming Mendoza – {report_month}")
+  # Convertir periodo (ej. '202507') a 'Julio 2025'
+from datetime import datetime
+
+meses = {
+    "01": "Enero", "02": "Febrero", "03": "Marzo", "04": "Abril",
+    "05": "Mayo", "06": "Junio", "07": "Julio", "08": "Agosto",
+    "09": "Septiembre", "10": "Octubre", "11": "Noviembre", "12": "Diciembre"
+}
+
+anio = periodo[:4]
+mes = periodo[4:6]
+titulo_legible = f"{meses.get(mes, mes)} {anio}"
+
+plt.title(f"Ranking Streaming Mendoza – {titulo_legible}")
+
     plt.gca().invert_yaxis()
     plt.tight_layout()
 
