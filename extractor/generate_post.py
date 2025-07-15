@@ -2,36 +2,38 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import os
 
-# 📁 Carpetas
+print("🚀 Iniciando script generate_post.py...")
+
+# 📁 Definir rutas
 DATA_DIR = "data"
 OUTPUT_DIR = "output"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-# 🔍 Buscar último archivo CSV
+# 🔍 Buscar último archivo CSV en /data
 csv_files = sorted([f for f in os.listdir(DATA_DIR) if f.endswith(".csv")])
 if not csv_files:
-    print("⚠️ No se encontró ningún archivo CSV en la carpeta /data/")
+    print("❌ ERROR: No se encontró ningún archivo CSV en la carpeta /data/")
     exit()
 
 latest_csv = csv_files[-1]
 report_month = latest_csv.split("_")[1].replace(".csv", "")
 csv_path = os.path.join(DATA_DIR, latest_csv)
-print(f"📄 Usando archivo: {csv_path}")
 
-# 📥 Leer CSV
+print(f"📄 Archivo detectado: {csv_path}")
+
+# 📥 Leer el CSV
 try:
     df = pd.read_csv(csv_path)
+    print(f"✅ CSV leído correctamente. Filas: {len(df)}")
 except Exception as e:
-    print(f"❌ Error al leer el archivo CSV: {e}")
+    print(f"❌ ERROR al leer el CSV: {e}")
     exit()
 
-print(f"✅ Archivo leído correctamente. Canales detectados: {len(df)}")
-
-# 🔕 Filtrar canal "Brava"
+# ❌ Excluir canal Brava
 df = df[df["Nombre"].str.lower() != "brava"]
-print(f"🔍 Filtrando Brava... Canales restantes: {len(df)}")
+print(f"🧹 Brava excluido. Canales restantes: {len(df)}")
 
-# 🧮 Cálculos
+# 🧮 Calcular métricas
 video_cols = [f"Video{i}_Vistas" for i in range(1, 6)]
 likes_cols = [f"Video{i}_Likes" for i in range(1, 6)]
 com_cols = [f"Video{i}_Comentarios" for i in range(1, 6)]
@@ -43,10 +45,11 @@ df["TotalComentarios"] = df[com_cols].sum(axis=1)
 df["TotalVistas"] = df[video_cols].sum(axis=1)
 df["Engagement100"] = ((df["TotalLikes"] + df["TotalComentarios"]) / df["TotalVistas"]) * 100
 
-print("📊 Métricas calculadas correctamente")
+print("📊 Métricas calculadas.")
 
-# 🏆 Top 10 por ratio vistas/suscriptor
+# 🏆 Top 10 por vistas/suscriptor
 top = df.sort_values("Ratio", ascending=False).head(10).reset_index(drop=True)
+print("🏅 Top 10 generado.")
 
 # 📈 Gráfico
 try:
@@ -56,11 +59,12 @@ try:
     plt.title(f"Ranking Streaming Mendoza – {report_month}")
     plt.gca().invert_yaxis()
     plt.tight_layout()
+
     image_path = os.path.join(OUTPUT_DIR, f"ranking_{report_month}.png")
     plt.savefig(image_path)
-    print(f"🖼️ Imagen generada: {image_path}")
+    print(f"🖼️ Imagen guardada: {image_path}")
 except Exception as e:
-    print(f"❌ Error al generar imagen: {e}")
+    print(f"❌ ERROR al generar imagen: {e}")
 
 # 📱 Texto Instagram
 instagram_text = f"""🔥 RANKING STREAMING MZA 🔥
@@ -107,4 +111,5 @@ with open(linkedin_path, "w", encoding="utf-8") as f:
     f.write(linkedin_text)
 print(f"💼 Texto para LinkedIn generado: {linkedin_path}")
 
-print("✅ Script finalizado correctamente.")
+print("✅ Script finalizado exitosamente.")
+
