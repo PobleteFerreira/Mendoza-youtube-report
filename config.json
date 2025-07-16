@@ -1,1 +1,11 @@
+{
+  "data_dir": "data",
+  "output_dir": "output",
+  "report_month": "202507",
+  "channels_file": "extractor/channels.csv",
+  "exclude_channels": ["FM BRAVA"],
+  "top_n": 10,
+  "title_prefix": "📊 Análisis mensual de streaming mendocino —",
+  "default_timezone": "America/Argentina/Mendoza"
+}
 
