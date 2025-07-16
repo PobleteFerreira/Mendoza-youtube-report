@@ -1,81 +1,91 @@
+#!/usr/bin/env python3
+"""
+Script actualizado para monitorear transmisiones en vivo de canales de YouTube.
+Registra vistas en vivo cada 30 minutos entre las 19:00 y las 22:00.
+Guarda los datos en `data/live_tracking/live_data_YYYYMMDD.csv` sin sobrescribir, para análisis longitudinal.
+"""
+
 import os
 import csv
-import json
-import time
-import pandas as pd
 from datetime import datetime
 from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
+import json
+import time
 
-# Config
-API_KEY = os.getenv("YOUTUBE_API_KEY")  # definida como secret en GitHub Actions o `.env`
-YOUTUBE_API_SERVICE_NAME = "youtube"
-YOUTUBE_API_VERSION = "v3"
+# Cargar claves desde config.json
+with open('config.json', 'r') as f:
+    config = json.load(f)
 
-# Directorios
-CHANNELS_CSV = "extractor/channels.csv"
-DATA_DIR = "data"
-os.makedirs(DATA_DIR, exist_ok=True)
+API_KEY = config['YOUTUBE_API_KEY']
+YOUTUBE = build('youtube', 'v3', developerKey=API_KEY)
+CHANNELS_CSV = 'extractor/channels.csv'
+OUTPUT_DIR = 'data/live_tracking'
+os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-# Fecha actual para nombrar el archivo
-today = datetime.today().strftime("%Y%m%d")
-output_path = os.path.join(DATA_DIR, f"live_{today}.csv")
+# Obtener canales a monitorear
+def cargar_canales():
+    canales = []
+    with open(CHANNELS_CSV, 'r', encoding='utf-8') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            canales.append({"id": row['CanalID'], "nombre": row['Nombre']})
+    return canales
 
-# Inicializar API
-youtube = build(YOUTUBE_API_SERVICE_NAME, YOUTUBE_API_VERSION, developerKey=API_KEY)
+# Verificar si canal está en vivo y obtener vistas en tiempo real
+def verificar_en_vivo(canal_id):
+    try:
+        response = YOUTUBE.search().list(
+            part='snippet', channelId=canal_id, type='video', eventType='live', maxResults=1
+        ).execute()
+        items = response.get('items', [])
+        if not items:
+            return None  # No hay live
 
-def get_live_stream_data(channel_id):
-    request = youtube.search().list(
-        part="snippet",
-        channelId=channel_id,
-        eventType="live",
-        type="video",
-        maxResults=1
-    )
-    response = request.execute()
-    items = response.get("items", [])
-    
-    if not items:
-        return None  # No está en vivo
+        video_id = items[0]['id']['videoId']
+        title = items[0]['snippet']['title']
 
-    video = items[0]
-    video_id = video["id"]["videoId"]
+        stats = YOUTUBE.videos().list(part='liveStreamingDetails', id=video_id).execute()
+        viewers = stats['items'][0]['liveStreamingDetails'].get('concurrentViewers', '0')
+        return video_id, title, int(viewers)
 
-    # Obtener estadísticas del video en vivo
-    stats_req = youtube.videos().list(part="snippet,liveStreamingDetails", id=video_id)
-    stats_res = stats_req.execute()
+    except HttpError as e:
+        print(f"⚠️ Error con el canal {canal_id}: {e}")
+        return None
 
-    details = stats_res["items"][0]
-    snippet = details["snippet"]
-    live = details.get("liveStreamingDetails", {})
+# Guardar resultados en archivo CSV
 
-    return {
-        "channel_id": channel_id,
-        "video_id": video_id,
-        "title": snippet.get("title"),
-        "published_at": snippet.get("publishedAt"),
-        "live_start_time": live.get("actualStartTime"),
-        "concurrent_viewers": live.get("concurrentViewers"),
-    }
+def guardar_resultado(fecha_hora, canal, estado, vistas, titulo):
+    fecha_str = fecha_hora.strftime('%Y%m%d')
+    archivo_csv = os.path.join(OUTPUT_DIR, f'live_data_{fecha_str}.csv')
+    existe = os.path.isfile(archivo_csv)
 
-# Leer canales
-channels_df = pd.read_csv(CHANNELS_CSV)
-data = []
+    with open(archivo_csv, 'a', newline='', encoding='utf-8') as f:
+        writer = csv.writer(f)
+        if not existe:
+            writer.writerow(['Timestamp', 'Canal', 'Estado', 'VistasEnVivo', 'Titulo'])
+        writer.writerow([fecha_hora.isoformat(), canal, estado, vistas, titulo])
 
-for _, row in channels_df.iterrows():
-    channel_id = row["CanalID"]
-    result = get_live_stream_data(channel_id)
-    if result:
-        print(f"🔴 EN VIVO: {row['Nombre']} — {result['concurrent_viewers']} viewers")
-        result["channel_name"] = row["Nombre"]
-        result["fecha_reporte"] = today
-        data.append(result)
-    else:
-        print(f"⚫ No en vivo: {row['Nombre']}")
+# Ejecución principal
 
-# Guardar CSV
-if data:
-    df = pd.DataFrame(data)
-    df.to_csv(output_path, index=False)
-    print(f"✅ Datos guardados en: {output_path}")
-else:
-    print("❌ Ningún canal en vivo hoy.")
+def monitorear():
+    ahora = datetime.now()
+    canales = cargar_canales()
+    print(f"\n⏱️ {ahora.strftime('%Y-%m-%d %H:%M:%S')} — Verificando canales...")
+
+    for canal in canales:
+        resultado = verificar_en_vivo(canal['id'])
+        if resultado:
+            video_id, titulo, vistas = resultado
+            estado = 'En vivo'
+        else:
+            titulo = ''
+            vistas = 0
+            estado = 'Offline'
+
+        guardar_resultado(ahora, canal['nombre'], estado, vistas, titulo)
+        print(f"  - {canal['nombre']}: {estado} — {vistas} vistas")
+
+if __name__ == '__main__':
+    monitorear()
+
