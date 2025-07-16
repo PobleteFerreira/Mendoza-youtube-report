@@ -1,1 +1,11 @@
+pip install -r extractor/requirements.txt
+pandas
+matplotlib
+seaborn
+python-dateutil
+numpy
+jupyter
+openpyxl
+google-api-python-client   # Si accedés directamente a la API de YouTube
+oauth2client               # Para autenticar con credenciales
 
