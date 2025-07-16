@@ -24,7 +24,7 @@ jobs:
     - name: Install dependencies
       run: |
         pip install --upgrade pip
-        pip install google-api-python-client pandas openpyxl python-dateutil
+        pip install google-api-python-client pandas openpyxl python-dateutil python-dotenv
 
     - name: Run extractor
       run: |
