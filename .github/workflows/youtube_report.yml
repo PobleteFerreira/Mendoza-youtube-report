@@ -1,9 +1,9 @@
 name: YouTube Mendoza Report - Monthly Extraction
 
 on:
-  workflow_dispatch:  # Para ejecutarlo a mano desde la UI de GitHub
+  workflow_dispatch:  # Permite ejecutarlo manualmente desde la UI de GitHub
   schedule:
-    - cron: '30 6 1 * *'   # Primer día de cada mes a las 6:30 UTC (puedes ajustar horario)
+    - cron: '30 6 1 * *'   # Primer día de cada mes a las 6:30 UTC (ajusta el horario si querés)
 
 jobs:
   build-and-run:
@@ -28,14 +28,13 @@ jobs:
 
     - name: Run extractor
       run: |
-        cd extractor
-        python extract_data_streaming_mendoza.py
+        python extractor/youtube_report.py
 
     - name: Add & commit results
       run: |
         git config --global user.email "bot@example.com"
         git config --global user.name "GitHub Actions Bot"
-        git add ../data/
+        git add data/
         git commit -m "Actualización mensual automática de datos de streaming" || echo "Nada para commitear"
         git push
 
