@@ -1,41 +1,40 @@
-name: YouTube Monthly Report
+# .github/workflows/youtube_report.yml
+
+name: YouTube Report Generator
 
 on:
   schedule:
-    - cron: '0 2 1 * *'
+    - cron: '0 14 * * 1'  # Ejecuta los lunes a las 11 AM Argentina (UTC-3)
   workflow_dispatch:
 
 jobs:
-  generate-report:
+  build:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout repo
+      - name: Checkout repositorio
         uses: actions/checkout@v3
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Configurar Python
+        uses: actions/setup-python@v4
         with:
-          python-version: '3.11'
+          python-version: '3.10'
 
-      - name: Install dependencies
-        run: pip install -r extractor/requirements.txt
-
-      - name: Set up YOUTUBE_API_KEY
-        env:
-          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
-        run: echo "YOUTUBE_API_KEY=${YOUTUBE_API_KEY}" > extractor/.env
-
-      - name: Run YouTube Report Script
-        run: python extractor/youtube_report.py
-
-      - name: Get current year and month
-        id: date
-        run: echo "month=$(date +'%Y%m')" >> $GITHUB_OUTPUT
-
-      - name: Commit and push report
+      - name: Instalar dependencias
         run: |
-          git config --global user.email "actions@github.com"
-          git config --global user.name "GitHub Actions"
-          git add data/report_${{ steps.date.outputs.month }}.csv
-          git commit -m "Automated monthly report [skip ci]" || echo "No changes to commit"
-          git push
+          python -m pip install --upgrade pip
+          pip install -r extractor/requirements.txt
+
+      - name: Ejecutar script de análisis mensual
+        run: |
+          python extractor/generate_post.py
+
+      - name: Subir cambios generados
+        run: |
+          git config --global user.name 'github-actions'
+          git config --global user.email 'actions@github.com'
+          git add output/
+          git commit -m "📊 Reporte mensual generado automáticamente"
+          git push origin main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
