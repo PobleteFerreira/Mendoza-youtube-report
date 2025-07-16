@@ -1,129 +1,89 @@
 import pandas as pd
 import matplotlib.pyplot as plt
+import seaborn as sns
 import os
+from datetime import datetime
 
-print("🚀 Iniciando script generate_post.py...")
-
-# 📁 Definir rutas
+# Configuraciones generales
 DATA_DIR = "data"
 OUTPUT_DIR = "output"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-# 🔍 Buscar último archivo CSV en /data
-csv_files = sorted([f for f in os.listdir(DATA_DIR) if f.endswith(".csv")])
-if not csv_files:
-    print("❌ ERROR: No se encontró ningún archivo CSV en la carpeta /data/")
-    exit()
+# Detectar archivo del mes actual
+def get_current_report_filename():
+    now = datetime.now()
+    return f"report_{now.strftime('%Y%m')}.csv"
 
-latest_csv = csv_files[-1]
-report_month = latest_csv.split("_")[1].replace(".csv", "")
-csv_path = os.path.join(DATA_DIR, latest_csv)
+# Leer CSV mensual
+def load_data():
+    file_path = os.path.join(DATA_DIR, get_current_report_filename())
+    print(f"📄 Archivo detectado: {file_path}")
+    df = pd.read_csv(file_path)
+    return df
 
-print(f"📄 Archivo detectado: {csv_path}")
+# Limpieza y preparación
+def clean_data(df):
+    df = df[df['Nombre'].str.contains("BRAVA") == False]  # Excluir BRAVA
+    df['TotalVistas5Videos'] = df[[f"Video{i}_Vistas" for i in range(1,6)]].sum(axis=1)
+    df['PromedioVistas5'] = df['TotalVistas5Videos'] / 5
+    df['RatioVistasSuscriptor'] = df['PromedioVistas5'] / df['Suscriptores'].replace(0, 1)
+    df['Engagement'] = (
+        df[[f"Video{i}_Likes" for i in range(1,6)]].sum(axis=1) +
+        df[[f"Video{i}_Comentarios" for i in range(1,6)]].sum(axis=1)
+    ) / df['TotalVistas5Videos'].replace(0, 1)
+    return df.sort_values(by='RatioVistasSuscriptor', ascending=False)
 
-# 📥 Leer el CSV
-try:
-    df = pd.read_csv(csv_path)
-    print(f"✅ CSV leído correctamente. Filas: {len(df)}")
-except Exception as e:
-    print(f"❌ ERROR al leer el CSV: {e}")
-    exit()
-
-# ❌ Excluir canal Brava
-df = df[df["Nombre"].str.lower() != "brava"]
-print(f"🧹 Brava excluido. Canales restantes: {len(df)}")
-
-# 🧮 Calcular métricas
-video_cols = [f"Video{i}_Vistas" for i in range(1, 6)]
-likes_cols = [f"Video{i}_Likes" for i in range(1, 6)]
-com_cols = [f"Video{i}_Comentarios" for i in range(1, 6)]
-
-df["PromVistas"] = df[video_cols].mean(axis=1)
-df["Ratio"] = df["PromVistas"] / df["Suscriptores"]
-df["TotalLikes"] = df[likes_cols].sum(axis=1)
-df["TotalComentarios"] = df[com_cols].sum(axis=1)
-df["TotalVistas"] = df[video_cols].sum(axis=1)
-df["Engagement100"] = ((df["TotalLikes"] + df["TotalComentarios"]) / df["TotalVistas"]) * 100
-
-print("📊 Métricas calculadas.")
-
-# 🏆 Top 10 por vistas/suscriptor
-top = df.sort_values("Ratio", ascending=False).head(10).reset_index(drop=True)
-print("🏅 Top 10 generado.")
-
-# 📈 Gráfico
-try:
-    plt.figure(figsize=(6, 4))
-    plt.barh(top["Nombre"], top["Ratio"])
+# Gráfico ranking
+def generate_ranking_chart(df):
+    top10 = df.head(10)
+    plt.figure(figsize=(10, 6))
+    sns.barplot(y='Nombre', x='RatioVistasSuscriptor', data=top10)
+    plt.title("Top 10 canales por vistas/suscriptor")
     plt.xlabel("Vistas por suscriptor")
-  # Convertir periodo (ej. '202507') a 'Julio 2025'
-from datetime import datetime
-
-meses = {
-    "01": "Enero", "02": "Febrero", "03": "Marzo", "04": "Abril",
-    "05": "Mayo", "06": "Junio", "07": "Julio", "08": "Agosto",
-    "09": "Septiembre", "10": "Octubre", "11": "Noviembre", "12": "Diciembre"
-}
-
-anio = periodo[:4]
-mes = periodo[4:6]
-titulo_legible = f"{meses.get(mes, mes)} {anio}"
-
-plt.title(f"Ranking Streaming Mendoza – {titulo_legible}")
-
-    plt.gca().invert_yaxis()
+    plt.ylabel("Canal")
+    now = datetime.now()
+    output_file = os.path.join(OUTPUT_DIR, f"ranking_{now.strftime('%Y%m')}.png")
     plt.tight_layout()
+    plt.savefig(output_file)
+    print(f"🖼️ Imagen guardada: {output_file}")
 
-    image_path = os.path.join(OUTPUT_DIR, f"ranking_{report_month}.png")
-    plt.savefig(image_path)
-    print(f"🖼️ Imagen guardada: {image_path}")
-except Exception as e:
-    print(f"❌ ERROR al generar imagen: {e}")
+# Texto resumen para Instagram
+def generate_instagram_text(df):
+    now = datetime.now()
+    top5 = df.head(5)
+    resumen = f"\U0001F3C6 Top 5 por vistas/suscriptor ({now.strftime('%B %Y')}):\n"
+    for idx, row in top5.iterrows():
+        resumen += f"{row['Nombre']} — {round(row['RatioVistasSuscriptor'], 2)} vistas/suscriptor\n"
+    resumen += "\n\U0001F4CA Medimos los últimos 5 videos en base a vistas, engagement, y relación con su base de seguidores."
+    output_txt = os.path.join(OUTPUT_DIR, f"resumen_instagram_{now.strftime('%Y%m')}.txt")
+    with open(output_txt, "w", encoding="utf-8") as f:
+        f.write(resumen)
+    print(f"📱 Texto para Instagram generado: {output_txt}")
 
-# 📱 Texto Instagram
-instagram_text = f"""🔥 RANKING STREAMING MZA 🔥
-¿Quién tiene más vistas por cada seguidor?
+# Texto resumen para LinkedIn
+def generate_linkedin_text(df):
+    now = datetime.now()
+    resumen = (
+        f"\U0001F4C8 Análisis mensual del ecosistema de streaming mendocino en YouTube ({now.strftime('%B %Y')}):\n\n"
+        "Comparando los últimos 5 videos de cada canal según vistas promedio, engagement (likes y comentarios sobre vistas)"
+        " y su relación con el total de suscriptores.\n\n"
+    )
+    for idx, row in df.head(5).iterrows():
+        resumen += f"{idx+1}. {row['Nombre']} — {round(row['PromedioVistas5'])} vistas promedio\n"
+    resumen += "\n#StreamingFederal #YouTubeMendoza #DatosQueHablan"
+    output_txt = os.path.join(OUTPUT_DIR, f"resumen_linkedin_{now.strftime('%Y%m')}.txt")
+    with open(output_txt, "w", encoding="utf-8") as f:
+        f.write(resumen)
+    print(f"💼 Texto para LinkedIn generado: {output_txt}")
 
-"""
-for i, row in top.iterrows():
-    estrella = "*" if "inactivo" in str(row.get("Estado", "")).lower() else ""
-    instagram_text += f"{i+1}️⃣ {row['Nombre']} — {int(row['Ratio'])} vistas x seguidor{estrella}\n"
+# Ejecutar
+if __name__ == "__main__":
+    print("\U0001F680 Iniciando script generate_post.py...")
+    df = load_data()
+    df = clean_data(df)
+    generate_ranking_chart(df)
+    generate_instagram_text(df)
+    generate_linkedin_text(df)
+    print("✅ Script finalizado exitosamente.")
 
-instagram_text += f"""
-💡 ¿Qué significa esto?
-Cuanto más alto este número, más "activa" está la comunidad. ¡No es solo cuántos te siguen, sino cuántos te ven!
-
-#YouTubeMendoza #StreamingArgentino #Datos
-"""
-
-insta_path = os.path.join(OUTPUT_DIR, f"resumen_instagram_{report_month}.txt")
-with open(insta_path, "w", encoding="utf-8") as f:
-    f.write(instagram_text)
-print(f"📱 Texto para Instagram generado: {insta_path}")
-
-# 💼 Texto LinkedIn
-linkedin_text = f"""📊 Informe mensual – YouTube Mendoza – {report_month}
-
-Este ranking muestra cuántas vistas obtiene cada canal por cada suscriptor. Es un buen indicador de fidelidad y activación de comunidad.
-
-🏆 Top 10 por vistas/suscriptor:
-"""
-
-for i, row in top.iterrows():
-    linkedin_text += f"{i+1}. {row['Nombre']} — {int(row['Ratio'])} vistas por suscriptor\n"
-
-linkedin_text += f"""
-
-💬 ¿Por qué importa esto?
-Un canal con pocos suscriptores pero muchas vistas puede tener una comunidad más activa que uno grande y pasivo. Este tipo de métricas nos ayuda a pensar más allá del “número de seguidores”.
-
-#YouTubeMendoza #StreamingInteligente #EconomiaDePlataformas #AnálisisDigital
-"""
-
-linkedin_path = os.path.join(OUTPUT_DIR, f"resumen_linkedin_{report_month}.txt")
-with open(linkedin_path, "w", encoding="utf-8") as f:
-    f.write(linkedin_text)
-print(f"💼 Texto para LinkedIn generado: {linkedin_path}")
-
-print("✅ Script finalizado exitosamente.")
 
