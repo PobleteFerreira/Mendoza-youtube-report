@@ -1,24 +1,29 @@
-# Python artifacts
-__pycache__/
+# Carpeta con salidas generadas automáticamente
+/output/
+
+# Entornos virtuales de Python
+venv/
+.env/
+.venv/
+
+# Archivos temporales o de sistema
 *.pyc
-
-# Data files (CSV reports)
-data/*.csv
-!data/report_202507.csv
-
-# Node.js artifacts
-frontend/node_modules/
-frontend/.next/
-frontend/.env.local
-
-# Environment variables
-extractor/.env
-*.env
-.env.*
-
-# VSCode
-.vscode/
-
-# OS files
+__pycache__/
 .DS_Store
-Thumbs.db
+
+# Archivos de configuración local
+config.json
+youtube_token.json
+client_secrets.json
+
+# Logs
+*.log
+
+# Archivos de notebook generados con salida
+*.ipynb_checkpoints
+
+# Carpetas ocultas y backup de editores
+*.swp
+*.bak
+.idea/
+.vscode/
