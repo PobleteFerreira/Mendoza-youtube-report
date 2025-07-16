@@ -1,41 +1,41 @@
-# .github/workflows/youtube_report.yml
-
-name: YouTube Report Generator
+name: YouTube Mendoza Report - Monthly Extraction
 
 on:
+  workflow_dispatch:  # Para ejecutarlo a mano desde la UI de GitHub
   schedule:
-    - cron: '0 14 * * 1'  # Ejecuta los lunes a las 11 AM Argentina (UTC-3)
-  workflow_dispatch:
+    - cron: '30 6 1 * *'   # Primer día de cada mes a las 6:30 UTC (puedes ajustar horario)
 
 jobs:
-  build:
+  build-and-run:
     runs-on: ubuntu-latest
 
+    env:
+      YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+
     steps:
-      - name: Checkout repositorio
-        uses: actions/checkout@v3
+    - name: Checkout repo
+      uses: actions/checkout@v4
 
-      - name: Configurar Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
 
-      - name: Instalar dependencias
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r extractor/requirements.txt
+    - name: Install dependencies
+      run: |
+        pip install --upgrade pip
+        pip install google-api-python-client pandas openpyxl python-dateutil
 
-      - name: Ejecutar script de análisis mensual
-        run: |
-          python extractor/generate_post.py
+    - name: Run extractor
+      run: |
+        cd extractor
+        python extract_data_streaming_mendoza.py
 
-      - name: Subir cambios generados
-        run: |
-          git config --global user.name 'github-actions'
-          git config --global user.email 'actions@github.com'
-          git add output/
-          git commit -m "📊 Reporte mensual generado automáticamente"
-          git push origin main
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Add & commit results
+      run: |
+        git config --global user.email "bot@example.com"
+        git config --global user.name "GitHub Actions Bot"
+        git add ../data/
+        git commit -m "Actualización mensual automática de datos de streaming" || echo "Nada para commitear"
+        git push
 
