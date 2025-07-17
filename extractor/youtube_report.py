@@ -139,7 +139,7 @@ def main():
                 'channel_title': nombre,
                 'month': month_year,
                 'video_id': v['video_id'],
-                'video_url': f'https://www.youtube.com/watch?v={v['video_id']}',
+                'video_url': f"https://www.youtube.com/watch?v={v['video_id']}",
                 'title': snip.get('title', ''),
                 'published_at': fecha_video,
                 'duration_sec': dur,
@@ -168,6 +168,8 @@ def main():
         canal_videos_dir.mkdir(parents=True, exist_ok=True)
         df_videos.to_csv(canal_videos_dir / f"videos_{month_year}.csv", index=False)
         df_top10.to_csv(canal_videos_dir / f"top10_videos_{month_year}.csv", index=False)
+        df_videos.to_excel(canal_videos_dir / f"videos_{month_year}.xlsx", index=False)
+        df_top10.to_excel(canal_videos_dir / f"top10_videos_{month_year}.xlsx", index=False)
 
         resumen_canales.append({
             'CanalID': channel_id,
@@ -195,8 +197,8 @@ def main():
     out_general = Path("data/canales") / f"report_{month_year}.csv"
     df_general = pd.DataFrame(resumen_canales)
     df_general.to_csv(out_general, index=False)
+    df_general.to_excel(Path("data/canales") / f"report_{month_year}.xlsx", index=False)
     print(f"✅ Reporte generado: {out_general}")
 
 if __name__ == "__main__":
     main()
-
