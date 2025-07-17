@@ -70,21 +70,38 @@ df["RankingSubs"] = df.groupby("Periodo")["Suscriptores"].rank(ascending=False, 
 df["RankingViews"] = df.groupby("Periodo")["VistasTotales"].rank(ascending=False, method='min')
 df["RankingRatio"] = df.groupby("Periodo")["RatioViews_Subs"].rank(ascending=False, method='min')
 
-# Ejemplo de gráfico: evolución de suscriptores (los 5 más grandes)
-top5 = df[df["Periodo"] == df["Periodo"].max()].sort_values("Suscriptores", ascending=False).head(5)["CanalID"]
+# Gráfico de evolución de suscriptores (Top 10)
+top10_subs = df[df["Periodo"] == df["Periodo"].max()].sort_values("Suscriptores", ascending=False).head(10)["CanalID"]
 plt.figure()
-for canal in top5:
+for canal in top10_subs:
     canal_data = df[df["CanalID"] == canal]
     plt.plot(canal_data["Periodo"], canal_data["Suscriptores"], marker='o', label=canal_data["Nombre"].iloc[0])
 plt.xlabel("Mes")
 plt.ylabel("Suscriptores")
-plt.title("Evolución de suscriptores - Top 5 canales")
+plt.title("Evolución de suscriptores - Top 10 canales")
 plt.legend()
 plt.grid(True, linestyle='--', alpha=0.3)
 plt.text(0.99, 0.01, FIRMA, fontsize=10, color="#888", ha='right', va='bottom', transform=plt.gca().transAxes)
 plt.tight_layout()
-plt.savefig(OUTDIR / "evolucion_suscriptores_top5.png")
+plt.savefig(OUTDIR / "evolucion_suscriptores_top10.png")
 plt.close()
+
+# Gráfico de evolución de visualizaciones (Top 10)
+top10_views = df[df["Periodo"] == df["Periodo"].max()].sort_values("VistasTotales", ascending=False).head(10)["CanalID"]
+plt.figure()
+for canal in top10_views:
+    canal_data = df[df["CanalID"] == canal]
+    plt.plot(canal_data["Periodo"], canal_data["VistasTotales"], marker='o', label=canal_data["Nombre"].iloc[0])
+plt.xlabel("Mes")
+plt.ylabel("Vistas totales")
+plt.title("Evolución de visualizaciones - Top 10 canales")
+plt.legend()
+plt.grid(True, linestyle='--', alpha=0.3)
+plt.text(0.99, 0.01, FIRMA, fontsize=10, color="#888", ha='right', va='bottom', transform=plt.gca().transAxes)
+plt.tight_layout()
+plt.savefig(OUTDIR / "evolucion_vistas_top10.png")
+plt.close()
+
 # Tabla resumen por canal (último mes)
 df_ultimo = df[df["Periodo"] == df["Periodo"].max()]
 tabla_ranking = df_ultimo[["Nombre", "Suscriptores", "VistasTotales", "CantidadVivosMes", "RankingSubs", "RankingViews", "RatioViews_Subs"]]
