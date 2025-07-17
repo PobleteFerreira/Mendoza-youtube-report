@@ -1,144 +1,215 @@
 import os
 import csv
+import re
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
+from pathlib import Path
 from googleapiclient.discovery import build
 from dotenv import load_dotenv
-from pathlib import Path
 
+# ==== Configuración ====
 def ensure_dirs():
-    """
-    Crea las carpetas data/, data/canales/ y data/videos/ si no existen.
-    """
     (Path("data") / "canales").mkdir(parents=True, exist_ok=True)
     (Path("data") / "videos").mkdir(parents=True, exist_ok=True)
 
+# Palabras y patrones para detectar plataformas/redes/monetización
+PLATAFORMAS_PATTERNS = {
+    "Cafecito": r"cafecito\.app",
+    "MercadoPago": r"mercadopago\.com|mpago\.la",
+    "PayPal": r"paypal\.me|paypal\.com",
+    "Patreon": r"patreon\.com",
+    "Twitch": r"twitch\.tv",
+    "Instagram": r"instagram\.com|instagr\.am",
+    "TikTok": r"tiktok\.com",
+    "Discord": r"discord\.gg|discord\.com",
+    "Telegram": r"t\.me|telegram\.me|telegram\.org",
+    "Facebook": r"facebook\.com|fb\.me",
+    "WebPropia": r"\.com\.ar|\.com|\.net|\.org",
+    "OnlyFans": r"onlyfans\.com",
+    "Sponsors/Apuestas": r"bet|casino|apuesta|sponsor|promo|descuento|código"
+}
 
-# Cargar la API Key desde .env
-load_dotenv()
-API_KEY = os.getenv('YOUTUBE_API_KEY')
+def detect_platforms(text: str):
+    detected = []
+    if not text:
+        return detected
+    for plat, pattern in PLATAFORMAS_PATTERNS.items():
+        if re.search(pattern, text, re.IGNORECASE):
+            detected.append(plat)
+    return detected
 
-# Palabras clave para monetización alternativa
-MONETIZATION_KEYWORDS = ['patreon', 'cafecito', 'paypal', 'donación', 'donate', 'mercadopago', 'contribuir', 'apóyanos', 'support']
+def extract_links(text: str):
+    if not text:
+        return []
+    return re.findall(r'https?://[^\s)]+', text)
 
-def detect_monetization(text):
-    text = text.lower() if text else ""
-    return any(keyword in text for keyword in MONETIZATION_KEYWORDS)
+def get_month_year():
+    now = datetime.now()
+    return f"{now.month:02d}-{now.year}"
+
+def calculate_periodicity(fecha_list):
+    if len(fecha_list) < 2:
+        return None
+    fechas = sorted([datetime.strptime(f, '%Y-%m-%dT%H:%M:%SZ') for f in fecha_list])
+    dias = [(fechas[i] - fechas[i-1]).days for i in range(1, len(fechas))]
+    return sum(dias) / len(dias) if dias else None
+
+# ==== MAIN ====
 
 def main():
     ensure_dirs()
-    # ... el resto de tu código principal ...
-
-    # Inicializar YouTube API
+    load_dotenv()
+    API_KEY = os.getenv('YOUTUBE_API_KEY')
     youtube = build('youtube', 'v3', developerKey=API_KEY)
-    
-    # Leer canales
-    channels = []
+
+    # Leer canales desde CSV
+    canales = []
     with open('extractor/channels.csv', newline='', encoding='utf-8') as csvfile:
-        reader = csv.DictReader(csvfile)
+        reader = csv.DictReader(csvfile, delimiter='\t')
         for row in reader:
-            channels.append(row)
+            canales.append(row)
+
+    # Variables generales
+    month_year = get_month_year()
+    resumen_canales = []
     
-    report_data = []
-    for ch in channels:
-        channel_id = ch['channel_id']
-        channel_url = ch['channel_url']
-        
-        # Obtener datos generales del canal
-        channel_response = youtube.channels().list(
-            part='snippet,statistics',
-            id=channel_id
-        ).execute()
-        if not channel_response['items']:
-            continue  # Canal no encontrado
-        
-        channel_info = channel_response['items'][0]
-        snippet = channel_info['snippet']
-        stats = channel_info['statistics']
-        
-        name = snippet.get('title')
-        description = snippet.get('description')
-        country = snippet.get('country', '')
-        published_at = snippet.get('publishedAt', '')
-        subscribers = stats.get('subscriberCount', '0')
-        views = stats.get('viewCount', '0')
+    for canal in canales:
+        channel_id = canal['channel_id']
+        channel_url = canal.get('channel_url', f'https://www.youtube.com/channel/{channel_id}')
+        # 1. Datos generales canal
+        channel_resp = youtube.channels().list(part='snippet,statistics', id=channel_id).execute()
+        if not channel_resp['items']:
+            continue
+        info = channel_resp['items'][0]
+        snippet = info['snippet']
+        stats = info['statistics']
+        desc = snippet.get('description', '')
+        plataformas_canal = detect_platforms(desc)
+        links_canal = extract_links(desc)
+        monet_canal = ', '.join(plataformas_canal) if plataformas_canal else 'No'
+        fecha_creacion = snippet.get('publishedAt', '')
+        subs = stats.get('subscriberCount', '0')
+        vistas = stats.get('viewCount', '0')
         video_count = stats.get('videoCount', '0')
-        monetization_in_desc = detect_monetization(description)
+        nombre = snippet.get('title', '')
+        pais = snippet.get('country', 'Argentina')
         
-        # Obtener los últimos 5 videos
-        uploads_playlist_id = youtube.channels().list(
-            part='contentDetails',
-            id=channel_id
-        ).execute()['items'][0]['contentDetails']['relatedPlaylists']['uploads']
-        playlist_items = youtube.playlistItems().list(
-            part='snippet',
-            playlistId=uploads_playlist_id,
-            maxResults=5
-        ).execute()['items']
-        
-        last_video_date = ""
-        videos_data = []
-        for idx, item in enumerate(playlist_items):
-            video_id = item['snippet']['resourceId']['videoId']
-            video_title = item['snippet']['title']
-            video_published = item['snippet']['publishedAt']
-            if idx == 0:
-                last_video_date = video_published
-            video_monetization = detect_monetization(video_title)
-            
-            # Obtener estadísticas del video
-            video_response = youtube.videos().list(
-                part='statistics',
+        # 2. Buscar vivos del último mes (solo transmisiones en vivo)
+        fecha_hace_un_mes = (datetime.utcnow() - timedelta(days=31)).isoformat("T") + "Z"
+        search_resp = youtube.search().list(
+            part='id,snippet',
+            channelId=channel_id,
+            type='video',
+            eventType='completed',
+            publishedAfter=fecha_hace_un_mes,
+            maxResults=50
+        ).execute()
+        vivos = []
+        for item in search_resp.get('items', []):
+            video_id = item['id']['videoId']
+            titulo = item['snippet']['title']
+            fecha_pub = item['snippet']['publishedAt']
+            vivos.append({
+                'video_id': video_id,
+                'title': titulo,
+                'published_at': fecha_pub
+            })
+        # Traer detalles y stats para cada video vivo
+        vivos_detalles = []
+        fechas_vivos = []
+        for idx, v in enumerate(sorted(vivos, key=lambda x: x['published_at'], reverse=True)[:10]):
+            video_id = v['video_id']
+            v_resp = youtube.videos().list(
+                part='snippet,statistics,liveStreamingDetails',
                 id=video_id
             ).execute()
-            if video_response['items']:
-                video_stats = video_response['items'][0]['statistics']
-                views_video = video_stats.get('viewCount', '0')
-                likes_video = video_stats.get('likeCount', '0')
-                comments_video = video_stats.get('commentCount', '0')
+            if not v_resp['items']:
+                continue
+            d = v_resp['items'][0]
+            snip = d['snippet']
+            stats = d['statistics']
+            live_det = d.get('liveStreamingDetails', {})
+            desc_video = snip.get('description', '')
+            plataformas_video = detect_platforms(desc_video)
+            links_video = extract_links(desc_video)
+            monet_video = ', '.join(plataformas_video) if plataformas_video else 'No'
+            fecha_video = snip.get('publishedAt', '')
+            fechas_vivos.append(fecha_video)
+            start = live_det.get('actualStartTime')
+            end = live_det.get('actualEndTime')
+            if start and end:
+                from dateutil import parser as dtparser
+                dur = (dtparser.parse(end) - dtparser.parse(start)).total_seconds()
             else:
-                views_video = likes_video = comments_video = '0'
-            
-            videos_data.extend([
-                video_title,
-                video_published,
-                views_video,
-                likes_video,
-                comments_video,
-                'Sí' if video_monetization else 'No'
-            ])
+                dur = None
+            vivos_detalles.append({
+                'channel_id': channel_id,
+                'channel_title': nombre,
+                'month': month_year,
+                'video_id': video_id,
+                'video_url': f'https://www.youtube.com/watch?v={video_id}',
+                'title': snip.get('title', ''),
+                'published_at': fecha_video,
+                'duration_sec': dur,
+                'view_count': stats.get('viewCount', '0'),
+                'like_count': stats.get('likeCount', '0'),
+                'comment_count': stats.get('commentCount', '0'),
+                'description': desc_video,
+                'monetizacion': monet_video,
+                'platforms': ', '.join(plataformas_video),
+                'links': ', '.join(links_video),
+                'ranking_mes': idx + 1,
+                'notas': ''
+            })
+
+        # --- SIGUE EN PARTE 2 ---
+        # 3. Calcular periodicidad/frecuencia de vivos
+        periodicidad = calculate_periodicity(fechas_vivos)
+        cantidad_vivos = len(vivos_detalles)
+        primer_vivo = min(fechas_vivos) if fechas_vivos else ""
+        ultimo_vivo = max(fechas_vivos) if fechas_vivos else ""
         
-        # Estado de actividad
-        last_video_dt = datetime.strptime(last_video_date, '%Y-%m-%dT%H:%M:%SZ') if last_video_date else None
-        months_since_last = (datetime.utcnow() - last_video_dt).days // 30 if last_video_dt else None
-        activo = 'Activo' if last_video_dt and months_since_last < 6 else 'Inactivo'
-        
-        # Compilar fila
-        row = [
-            channel_id, name, channel_url, description, country, published_at,
-            subscribers, views, video_count, last_video_date, activo,
-            'Sí' if monetization_in_desc else 'No'
-        ]
-        # Añadir datos de los 5 videos
-        row.extend(videos_data)
-        report_data.append(row)
-    
-    # Definir columnas
-    cols = [
-        'CanalID', 'Nombre', 'URL', 'Descripcion', 'Pais', 'FechaCreacion',
-        'Suscriptores', 'VistasTotales', 'CantidadVideos', 'FechaUltimoVideo', 'Estado',
-        'MonetizacionAlternativa_desc'
-    ]
-    for i in range(1, 6):
-        cols.extend([
-            f'Video{i}_Titulo', f'Video{i}_Fecha', f'Video{i}_Vistas', f'Video{i}_Likes', f'Video{i}_Comentarios', f'Video{i}_Monetizacion'
-        ])
-    
-    # Guardar CSV
-    df = pd.DataFrame(report_data, columns=cols)
-    out_path = f'data/report_{datetime.utcnow().strftime("%Y%m")}.csv'
-    df.to_csv(out_path, index=False, encoding='utf-8')
-    print(f'Reporte guardado en {out_path}')
+        # 4. Guardar archivo de videos (por canal)
+        canal_videos_dir = Path("data/videos") / f"canal_{channel_id}"
+        canal_videos_dir.mkdir(parents=True, exist_ok=True)
+        out_videos = canal_videos_dir / f"videos_{month_year}.csv"
+        df_videos = pd.DataFrame(vivos_detalles)
+        df_videos.to_csv(out_videos, index=False, encoding='utf-8')
+        # Si querés también Excel:
+        out_videos_xlsx = canal_videos_dir / f"videos_{month_year}.xlsx"
+        df_videos.to_excel(out_videos_xlsx, index=False)
+
+        # 5. Resumen para archivo general de canales
+        resumen_canales.append({
+            'CanalID': channel_id,
+            'Nombre': nombre,
+            'URL': channel_url,
+            'Descripcion': desc,
+            'Pais': pais,
+            'FechaCreacion': fecha_creacion,
+            'Suscriptores': subs,
+            'VistasTotales': vistas,
+            'CantidadVideos': video_count,
+            'CantidadVivosMes': cantidad_vivos,
+            'PeriodicidadVivos_dias': periodicidad if periodicidad is not None else "",
+            'FechaPrimerVivoMes': primer_vivo,
+            'FechaUltimoVivoMes': ultimo_vivo,
+            'MonetizacionAlternativa_desc': monet_canal,
+            'Links_desc': ', '.join(links_canal),
+            'Plataformas_desc': ', '.join(plataformas_canal),
+            'notas': ''
+        })
+
+    # 6. Guardar archivo general de canales
+    out_general = Path("data/canales") / f"report_{month_year}.csv"
+    df_general = pd.DataFrame(resumen_canales)
+    df_general.to_csv(out_general, index=False, encoding='utf-8')
+    # Si querés también Excel:
+    out_general_xlsx = Path("data/canales") / f"report_{month_year}.xlsx"
+    df_general.to_excel(out_general_xlsx, index=False)
+
+    print(f"Reportes guardados: {out_general}, archivos de videos en carpeta data/videos/")
 
 if __name__ == "__main__":
     main()
+
