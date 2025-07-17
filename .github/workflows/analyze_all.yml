@@ -26,7 +26,8 @@ jobs:
 
     - name: Run general analysis
       run: |
-        python analyze_all.py
+        python extractor/analyze_all.py
+
 
     - name: Commit & push informes
       run: |
