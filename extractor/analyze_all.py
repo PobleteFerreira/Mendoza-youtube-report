@@ -111,9 +111,9 @@ with open(OUTDIR / "informe_linkedin.txt", "w", encoding="utf-8") as f:
 
 # Texto breve para Instagram
 insta_txt = f""" Top 3 canales más vistos en {df_ultimo['Periodo'].iloc[0]}:
-1️⃣ {df_ultimo.sort_values('VistasTotales', ascending=False).iloc[0]['Nombre']}
-2️⃣ {df_ultimo.sort_values('VistasTotales', ascending=False).iloc[1]['Nombre']}
-3️⃣ {df_ultimo.sort_values('VistasTotales', ascending=False).iloc[2]['Nombre']}
+1 {df_ultimo.sort_values('VistasTotales', ascending=False).iloc[0]['Nombre']}
+2 {df_ultimo.sort_values('VistasTotales', ascending=False).iloc[1]['Nombre']}
+3 {df_ultimo.sort_values('VistasTotales', ascending=False).iloc[2]['Nombre']}
 by Andrés Poblete"""
 with open(OUTDIR / "informe_instagram.txt", "w", encoding="utf-8") as f:
     f.write(insta_txt.strip())
