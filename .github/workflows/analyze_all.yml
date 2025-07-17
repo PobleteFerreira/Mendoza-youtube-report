@@ -1,0 +1,37 @@
+name: Análisis Longitudinal Streaming Mendoza
+
+on:
+  workflow_dispatch:      # Para lanzarlo manualmente si querés
+  push:
+    paths:
+      - 'data/canales/*.csv'   # Solo se dispara si hay cambios en estos archivos
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        pip install --upgrade pip
+        pip install pandas matplotlib seaborn openpyxl
+
+    - name: Run general analysis
+      run: |
+        python analyze_all.py
+
+    - name: Commit & push informes
+      run: |
+        git config --global user.email "bot@example.com"
+        git config --global user.name "GitHub Actions Bot"
+        git add data/informes/
+        git commit -m "Actualización de informes automáticos"
+        git push || echo "Nada para commitear"
