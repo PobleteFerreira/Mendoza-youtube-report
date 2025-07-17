@@ -159,9 +159,10 @@ def main():
         primer_vivo = min(fechas_vivos) if fechas_vivos else ""
         ultimo_vivo = max(fechas_vivos) if fechas_vivos else ""
 
-        # Top 10 más vistos
-        df_videos = pd.DataFrame(vivos_detalles)
-        df_top10 = df_videos.sort_values(by='view_count', ascending=False).head(10)
+   # Top 10 más vistos (asegurando que 'view_count' sea numérico)
+df_videos = pd.DataFrame(vivos_detalles)
+df_videos['view_count'] = pd.to_numeric(df_videos['view_count'], errors='coerce').fillna(0).astype(int)
+df_top10 = df_videos.sort_values(by='view_count', ascending=False).head(10)
 
         # Guardar archivos
         canal_videos_dir = Path("data/videos") / f"canal_{channel_id}"
