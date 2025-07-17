@@ -153,16 +153,43 @@ def main():
                 'notas': ''
             })
 
+        # Verificar si hubo vivos este mes
+        if not vivos_detalles:
+            print(f"🔸 Canal sin vivos este mes: {nombre}")
+            resumen_canales.append({
+                'CanalID': channel_id,
+                'Nombre': nombre,
+                'URL': channel_url,
+                'Descripcion': desc,
+                'Pais': pais,
+                'FechaCreacion': fecha_creacion,
+                'Suscriptores': subs,
+                'VistasTotales': vistas,
+                'CantidadVideos': video_count,
+                'CantidadVivosMes': 0,
+                'PromedioDiasEntreVivos': '',
+                'FrecuenciaSemanal': '',
+                'FrecuenciaDiaria': '',
+                'FechaPrimerVivoMes': '',
+                'FechaUltimoVivoMes': '',
+                'MonetizacionAlternativa_desc': monet_canal,
+                'Links_desc': ', '.join(links_canal),
+                'Plataformas_desc': ', '.join(plataformas_canal),
+                'notas': 'Sin vivos en el mes'
+            })
+            continue
+
+        # Top 10 más vistos (asegurar valores numéricos)
+        df_videos = pd.DataFrame(vivos_detalles)
+        for col in ['view_count', 'like_count', 'comment_count']:
+            df_videos[col] = pd.to_numeric(df_videos[col], errors='coerce').fillna(0).astype(int)
+        df_top10 = df_videos.sort_values(by='view_count', ascending=False).head(10)
+
         # Periodicidad y frecuencia
         promedio_dias, frecuencia_sem, frecuencia_dia = calculate_periodicity(fechas_vivos)
         cantidad_vivos = len(vivos_detalles)
         primer_vivo = min(fechas_vivos) if fechas_vivos else ""
         ultimo_vivo = max(fechas_vivos) if fechas_vivos else ""
-
-   # Top 10 más vistos (asegurando que 'view_count' sea numérico)
-df_videos = pd.DataFrame(vivos_detalles)
-df_videos['view_count'] = pd.to_numeric(df_videos['view_count'], errors='coerce').fillna(0).astype(int)
-df_top10 = df_videos.sort_values(by='view_count', ascending=False).head(10)
 
         # Guardar archivos
         canal_videos_dir = Path("data/videos") / f"canal_{channel_id}"
