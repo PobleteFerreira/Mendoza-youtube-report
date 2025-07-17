@@ -96,11 +96,11 @@ tabla_ranking.to_csv(OUTDIR / "ranking_general.csv", index=False)
 top_canal = df_ultimo.sort_values("CrecimientoSubs", ascending=False).iloc[0]
 crecimiento = int(top_canal['CrecimientoSubs']) if pd.notna(top_canal['CrecimientoSubs']) else 0
 linkedin_txt = f"""
-🚀 Informe Mensual Streaming Mendocino ({df_ultimo['Periodo'].iloc[0]})
+Informe Mensual Streaming Mendocino ({df_ultimo['Periodo'].iloc[0]})
 El canal que más creció en suscriptores fue {top_canal['Nombre']} (+{crecimiento}).
 ...
 """
-🚀 Informe Mensual Streaming Mendocino ({df_ultimo['Periodo'].iloc[0]})
+Informe Mensual Streaming Mendocino ({df_ultimo['Periodo'].iloc[0]})
 El canal que más creció en suscriptores fue {top_canal['Nombre']} (+{int(top_canal['CrecimientoSubs'])}).
 El canal con más vivos: {df_ultimo.sort_values('CantidadVivosMes', ascending=False).iloc[0]['Nombre']}.
 Top 3 por vistas: {', '.join(df_ultimo.sort_values('VistasTotales', ascending=False).head(3)['Nombre'].tolist())}.
@@ -110,7 +110,7 @@ with open(OUTDIR / "informe_linkedin.txt", "w", encoding="utf-8") as f:
     f.write(linkedin_txt.strip())
 
 # Texto breve para Instagram
-insta_txt = f"""🔥 Top 3 canales más vistos en {df_ultimo['Periodo'].iloc[0]}:
+insta_txt = f""" Top 3 canales más vistos en {df_ultimo['Periodo'].iloc[0]}:
 1️⃣ {df_ultimo.sort_values('VistasTotales', ascending=False).iloc[0]['Nombre']}
 2️⃣ {df_ultimo.sort_values('VistasTotales', ascending=False).iloc[1]['Nombre']}
 3️⃣ {df_ultimo.sort_values('VistasTotales', ascending=False).iloc[2]['Nombre']}
