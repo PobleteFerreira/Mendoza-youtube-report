@@ -65,7 +65,7 @@ def main():
     # Leer canales desde CSV
     canales = []
     with open('extractor/channels.csv', newline='', encoding='utf-8') as csvfile:
-        reader = csv.DictReader(csvfile, delimiter='\t')
+        reader = csv.DictReader(csvfile)
         for row in reader:
             canales.append(row)
 
