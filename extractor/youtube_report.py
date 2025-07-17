@@ -4,6 +4,15 @@ import pandas as pd
 from datetime import datetime
 from googleapiclient.discovery import build
 from dotenv import load_dotenv
+from pathlib import Path
+
+def ensure_dirs():
+    """
+    Crea las carpetas data/, data/canales/ y data/videos/ si no existen.
+    """
+    (Path("data") / "canales").mkdir(parents=True, exist_ok=True)
+    (Path("data") / "videos").mkdir(parents=True, exist_ok=True)
+
 
 # Cargar la API Key desde .env
 load_dotenv()
@@ -17,6 +26,9 @@ def detect_monetization(text):
     return any(keyword in text for keyword in MONETIZATION_KEYWORDS)
 
 def main():
+    ensure_dirs()
+    # ... el resto de tu código principal ...
+
     # Inicializar YouTube API
     youtube = build('youtube', 'v3', developerKey=API_KEY)
     
