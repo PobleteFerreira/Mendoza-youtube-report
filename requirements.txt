@@ -1,11 +1,12 @@
-pip install -r extractor/requirements.txt
+# Librerías base para análisis y visualización
 pandas
 matplotlib
 seaborn
-python-dateutil
-numpy
-jupyter
-openpyxl
-google-api-python-client   # Si accedés directamente a la API de YouTube
-oauth2client               # Para autenticar con credenciales
 
+# Para manejo de fechas y hojas Excel
+python-dateutil
+openpyxl
+
+# API de YouTube
+google-api-python-client
+oauth2client
