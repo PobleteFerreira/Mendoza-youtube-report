@@ -1,36 +1,51 @@
+# .github/workflows/monthly-shorts.yml
 name: Shorts mensual
 
 on:
   schedule:
-    - cron: '0 4 2 * *'  # Día 2 de cada mes a las 04:00 UTC
-  workflow_dispatch:     # También permite ejecución manual
+    - cron: '0 4 2 * *'   # Día 2 de cada mes a las 04:00 UTC
+  workflow_dispatch:      # Permite disparo manual
 
 jobs:
   run-shorts-script:
     runs-on: ubuntu-latest
 
     steps:
-    - name: 📥 Clonar repositorio
-      uses: actions/checkout@v3
+      - name: 📥 Clonar repositorio
+        uses: actions/checkout@v3
+        with:
+          # Habilita push de vuelta al mismo repo con el token
+          persist-credentials: true
 
-    - name: 🐍 Configurar Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.10'
+      - name: 🛠 Preparar carpeta de salida
+        run: mkdir -p data/shorts
 
-    - name: 📦 Instalar dependencias
-      run: |
-        pip install -r requirements.txt
-        pip install python-dotenv isodate
+      - name: 🐍 Configurar Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
 
-    - name: ▶️ Ejecutar análisis de Shorts
-      env:
-        YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
-      run: |
-        python extractor/shorts_analysis.py
+      - name: 📦 Instalar dependencias
+        run: |
+          pip install -r requirements.txt
+          pip install python-dotenv isodate
 
-    - name: 📤 Subir archivo de salida
-      uses: actions/upload-artifact@v4
-      with:
-        name: shorts_${{ github.run_id }}
-        path: data/shorts/
+      - name: ▶️ Ejecutar análisis de Shorts
+        env:
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+        run: python extractor/shorts_analysis.py
+
+      - name: 🕵️‍♂️ Debug: listar resultados
+        run: |
+          echo "📂 Contenido de data/shorts/"
+          ls -R data/shorts || echo "⚠️ No se encontró data/shorts"
+
+      - name: 📄 Commit y push de datos
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/shorts/*.csv
+          git diff --quiet && echo "✅ No hay cambios en data/shorts" || (git commit -m "chore: agregar shorts data mensuales (run ${{ github.run_id }})" && git push)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
