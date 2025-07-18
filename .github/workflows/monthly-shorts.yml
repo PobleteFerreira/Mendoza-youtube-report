@@ -30,7 +30,7 @@ jobs:
         python extractor/shorts_analysis.py
 
     - name: 📤 Subir archivo de salida
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: shorts_${{ github.run_id }}
         path: data/shorts/
