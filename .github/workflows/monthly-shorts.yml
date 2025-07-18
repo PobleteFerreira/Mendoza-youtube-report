@@ -1,13 +1,13 @@
 # .github/workflows/monthly-shorts.yml
 name: Shorts mensual
 
-# Habilitamos manual dispatch y schedule
+# Permite ejecuciones programadas y manuales
 on:
-  workflow_dispatch:
+  workflow_dispatch:        # botón “Run workflow” en GitHub
   schedule:
-    - cron: '0 4 2 * *'  # Día 2 de cada mes a las 04:00 UTC
+    - cron: '0 4 2 * *'     # día 2 de cada mes a las 04:00 UTC
 
-# Damos permiso explícito para que el GITHUB_TOKEN pueda escribir en el repo
+# Necesitamos permisos de escritura para commitear
 permissions:
   contents: write
 
@@ -16,16 +16,15 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: 📥 Clonar repositorio
+      - name: 📥 Checkout repo
         uses: actions/checkout@v3
         with:
-          # Importante para que luego podamos pushear
-          persist-credentials: true
+          persist-credentials: true  # conserva GITHUB_TOKEN para push
 
-      - name: 🛠 Preparar carpeta de salida
+      - name: 🛠 Crear carpeta de salida
         run: mkdir -p data/shorts
 
-      - name: 🐍 Configurar Python
+      - name: 🐍 Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
@@ -35,23 +34,24 @@ jobs:
           pip install -r requirements.txt
           pip install python-dotenv isodate
 
-      - name: ▶️ Ejecutar análisis de Shorts
+      - name: ▶️ Correr Shorts Analysis
         env:
           YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
         run: python extractor/shorts_analysis.py
 
-      - name: 🕵️‍♂️ Debug: listar resultados
+      - name: 🕵️‍♂️ Verificar archivos generados
         run: |
-          echo "📂 Contenido de data/shorts:"
-          ls -R data/shorts || echo "⚠️ No se encontró data/shorts"
+          echo "Contenido de data/shorts/:"
+          ls -R data/shorts
 
-      - name: 📄 Commit y push de datos
+      - name: 📄 Commit y Push de CSV
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add data/shorts/*.csv
-          # Solo commitea si hay cambios
+          # Sólo commitea si hay cambios
           git diff --cached --quiet || git commit -m "chore: actualizar data/shorts (run ${{ github.run_id }})"
           git push
-
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
