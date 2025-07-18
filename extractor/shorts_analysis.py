@@ -4,7 +4,7 @@ Analiza Shorts de YouTube de una lista de canales.
 Extrae métricas de videos de hasta 60 segundos publicados recientemente.
 
 Requiere:
-- Archivo extractor/channels.csv con columnas: CanalID,Nombre
+- Archivo extractor/channels.csv con columnas: CanalID,Nombre o channel_id,channel_url
 - Variable de entorno YOUTUBE_API_KEY (configurada como secret en GitHub Actions)
 
 Salida:
@@ -27,7 +27,7 @@ load_dotenv()
 API_KEY = os.getenv("YOUTUBE_API_KEY")
 YOUTUBE_API_URL = "https://www.googleapis.com/youtube/v3"
 
-# Cargar lista de canales
+# Archivos
 CHANNELS_FILE = Path("extractor/channels.csv")
 OUTPUT_DIR = Path("data/shorts")
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -95,14 +95,25 @@ def extract_shorts_metrics(canal_id, canal_nombre):
 
 def main():
     df_canales = pd.read_csv(CHANNELS_FILE)
+
+    # Detectar estructura de columnas
+    if "CanalID" in df_canales.columns and "Nombre" in df_canales.columns:
+        id_col = "CanalID"
+        name_col = "Nombre"
+    elif "channel_id" in df_canales.columns and "channel_url" in df_canales.columns:
+        id_col = "channel_id"
+        name_col = "channel_url"
+    else:
+        raise ValueError("⚠️ Las columnas del CSV no son válidas. Se esperaban: CanalID/Nombre o channel_id/channel_url")
+
     mes_actual = datetime.utcnow().strftime("%Y-%m")
     salida = OUTPUT_DIR / f"shorts_{mes_actual}.csv"
 
     todos_los_datos = []
 
     for _, row in df_canales.iterrows():
-        canal_id = row["CanalID"]
-        nombre = row["Nombre"]
+        canal_id = row[id_col]
+        nombre = row[name_col]
         print(f"🔍 Procesando canal: {nombre}")
         datos = extract_shorts_metrics(canal_id, nombre)
         todos_los_datos.extend(datos)
@@ -117,3 +128,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
