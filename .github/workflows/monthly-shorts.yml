@@ -1,0 +1,36 @@
+name: Shorts mensual
+
+on:
+  schedule:
+    - cron: '0 4 2 * *'  # Día 2 de cada mes a las 04:00 UTC
+  workflow_dispatch:     # También permite ejecución manual
+
+jobs:
+  run-shorts-script:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: 📥 Clonar repositorio
+      uses: actions/checkout@v3
+
+    - name: 🐍 Configurar Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    - name: 📦 Instalar dependencias
+      run: |
+        pip install -r requirements.txt
+        pip install python-dotenv isodate
+
+    - name: ▶️ Ejecutar análisis de Shorts
+      env:
+        YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+      run: |
+        python extractor/shorts_analysis.py
+
+    - name: 📤 Subir archivo de salida
+      uses: actions/upload-artifact@v3
+      with:
+        name: shorts_${{ github.run_id }}
+        path: data/shorts/
