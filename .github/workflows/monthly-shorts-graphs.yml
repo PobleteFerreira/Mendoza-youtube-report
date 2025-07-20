@@ -29,13 +29,12 @@ jobs:
           pip install pandas matplotlib
 
       - name: ▶️ Run longitudinal analysis & graphing
--        run: python extractor/shorts_longitudinal_analysis.py
-+        run: python extractor/shorts_growth_analysis.py
+        run: python extractor/shorts_growth_analysis.py
 
       - name: 🕵️‍♂️ Verify outputs
         run: |
           ls -l data/shorts/resumen_shorts.csv || echo "⚠️ resumen_shorts.csv no existe"
-          ls -l data/shorts/graficos/*.png || echo "⚠️ no se encontraron gráficos"
+          ls -l data/shorts/graficos/*.png   || echo "⚠️ no se encontraron gráficos"
 
       - name: 📄 Commit and Push graphs
         env:
