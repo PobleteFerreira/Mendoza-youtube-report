@@ -1,0 +1,53 @@
+name: "Analizar Ratio Mensual de Vivos"
+
+on:
+  push:
+    paths:
+      - 'extractor/analizador_ratio_mes.py'
+      - 'data/canales/**'
+      - 'data/videos/**'
+  workflow_dispatch:
+
+jobs:
+  analisis_ratio:
+    name: Ejecutar Análisis de Ratio de Vivos
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout del repositorio
+        uses: actions/checkout@v3
+
+      - name: 🐍 Configurar Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: 🚀 Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: 📂 Asegurar carpeta de salida
+        run: |
+          echo "Creando carpeta data/informes si no existe..."
+          mkdir -p data/informes
+
+      - name: ▶️ Ejecutar script de análisis
+        env:
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+        run: |
+          set -euxo pipefail
+          echo "Iniciando análisis de ratio de vivos para el mes más reciente..."
+          python extractor/analizador_ratio_mes.py
+          echo "✅ Análisis finalizado con éxito."
+
+      - name: 📦 Subir reporte como artefacto
+        if: success()
+        uses: actions/upload-artifact@v3
+        with:
+          name: tabla-vivos-ratio
+          path: data/informes/tabla_vivos_ratio_*.csv
+
+      - name: ❌ Notificar error
+        if: failure()
+        run: |
+          echo "⚠️ Ha ocurrido un error durante el análisis. Revisa los logs para más detalles."
