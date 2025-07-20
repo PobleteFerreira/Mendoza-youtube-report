@@ -1,15 +1,15 @@
 name: Monthly Shorts Graph Generation
 
 on:
-  schedule:
-    - cron: '0 4 3 * *'   # 04:00 UTC del día 3 de cada mes
   workflow_dispatch:
+  schedule:
+    - cron: '0 4 3 * *'  # Día 3 de cada mes a las 04:00 UTC
 
 permissions:
   contents: write
 
 jobs:
-  generate-graphs:
+  graph:
     runs-on: ubuntu-latest
 
     steps:
@@ -24,20 +24,13 @@ jobs:
           mkdir -p data/shorts_stats
           mkdir -p data/shorts_stats/graficos
 
-      - name: Setup Python
+      - name: Setup Python 3.10
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
 
       - name: Install dependencies
-        run: |
-          pip install -r extractor/requirements.txt
-          pip install pandas matplotlib
-
-      - name: Run monthly Shorts extraction
-        env:
-          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
-        run: python extractor/shorts_analysis.py
+        run: pip install pandas matplotlib
 
       - name: Run longitudinal graphing
         run: python extractor/shorts_growth_analysis.py
@@ -47,27 +40,23 @@ jobs:
           ls data/shorts_stats/resumen_shorts.csv   || echo "⚠️ resumen_shorts.csv missing"
           ls data/shorts_stats/graficos/*.png       || echo "⚠️ No graphs generated"
 
-      - name: Commit and Push results (robust)
+      - name: Commit & push graphs
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          FILES_ADDED=false
-
+          FILES=false
           if [ -f data/shorts_stats/resumen_shorts.csv ]; then
             git add data/shorts_stats/resumen_shorts.csv
-            FILES_ADDED=true
+            FILES=true
           fi
-
           if ls data/shorts_stats/graficos/*.png 1> /dev/null 2>&1; then
             git add data/shorts_stats/graficos/*.png
-            FILES_ADDED=true
+            FILES=true
           fi
-
-          if [ "$FILES_ADDED" = "true" ]; then
-            git diff --cached --quiet || git commit -m "chore: update monthly shorts graphs (run ${{ github.run_id }})"
+          if [ "$FILES" = true ]; then
+            git commit -m "chore: update monthly shorts graphs (run ${{ github.run_id }})"
             git push origin HEAD:main
           else
             echo "✅ Nothing to commit"
