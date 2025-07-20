@@ -34,7 +34,7 @@ jobs:
       - name: ▶️ Ejecutar Shorts Stats
         env:
           YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
-        run: python extractor/shorts_stats.py
+        run: python extractor/shorts_analysis.py
 
       - name: 🕵️‍♂️ Listar archivos generados
         run: ls -l data/shorts_stats
