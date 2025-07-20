@@ -1,96 +1,112 @@
 #!/usr/bin/env python3
 """
-Analiza la evolución mensual de los Shorts de canales de YouTube.
-Lee todos los archivos mensuales generados por shorts_analysis.py y genera:
-- CSV resumen por canal y mes
-- Gráficos de evolución en tonos pasteles
+Genera un análisis longitudinal y gráficos de YouTube Shorts basados en los datos mensuales extraídos por `shorts_analysis.py`.
 
-Requiere: archivos en data/shorts/shorts_YYYY-MM.csv
-Salida: data/shorts/resumen_shorts.csv + gráficas en /data/shorts/graficos/
+Requisitos:
+- Archivos CSV mensuales en `data/shorts/shorts_YYYY-MM.csv`.
+- Python 3.10+
+- Paquetes: pandas, matplotlib
+
+Salida:
+- CSV resumen: `data/shorts/resumen_shorts.csv`
+- Gráficos EN <periodo> en `data/shorts/graficos/`:
+    - cantidad_shorts.png
+    - vistas_totales.png
+    - vistas_promedio.png
+    - engagement_rate.png
 """
-
 import pandas as pd
 import matplotlib.pyplot as plt
-import seaborn as sns
 from pathlib import Path
 
-# Configuración
-INPUT_DIR = Path("data/shorts/")
-GRAFICOS_DIR = INPUT_DIR / "graficos"
-GRAFICOS_DIR.mkdir(parents=True, exist_ok=True)
 
-# Leer todos los archivos shorts_YYYY-MM.csv
-archivos = list(INPUT_DIR.glob("shorts_*.csv"))
-df_list = []
+def main():
+    # Definir rutas
+    INPUT_DIR = Path("data/shorts")
+    OUTPUT_CSV = INPUT_DIR / "resumen_shorts.csv"
+    GRAFICOS_DIR = INPUT_DIR / "graficos"
+    GRAFICOS_DIR.mkdir(parents=True, exist_ok=True)
 
-for file in archivos:
-    mes = file.stem.split("_")[1]
-    df = pd.read_csv(file)
-    df["Periodo"] = mes
-    df_list.append(df)
+    # Buscar archivos mensuales
+    archivos = sorted(INPUT_DIR.glob("shorts_*.csv"))
+    if not archivos:
+        print(f"⚠️ No se encontraron archivos shorts_*.csv en {INPUT_DIR}")
+        return
 
-# Combinar todos los meses
-df_all = pd.concat(df_list, ignore_index=True)
+    # Leer y concatenar todos los meses
+    df_list = []
+    for file in archivos:
+        periodo = file.stem.split('_')[1]
+        try:
+            df = pd.read_csv(file)
+            df["Periodo"] = pd.to_datetime(periodo, format="%Y-%m")
+            df_list.append(df)
+        except Exception as e:
+            print(f"⚠️ Error al leer {file}: {e}")
 
-# Asegurar formatos
-df_all["Fecha"] = pd.to_datetime(df_all["Fecha"], errors='coerce')
-df_all["Periodo"] = pd.to_datetime(df_all["Periodo"], format="%Y-%m")
+    df_all = pd.concat(df_list, ignore_index=True) if df_list else pd.DataFrame()
+    if df_all.empty:
+        print("⚠️ No hay datos para analizar después de concatenar.")
+        return
 
-# Agrupar por canal y mes
-resumen = df_all.groupby(["CanalID", "Nombre", "Periodo"]).agg({
-    "VideoID": "count",
-    "Vistas": "sum",
-    "Likes": "sum",
-    "Comentarios": "sum"
-}).reset_index()
+    # Asegurar formatos de fecha
+    df_all["Fecha"] = pd.to_datetime(df_all["Fecha"], errors='coerce')
 
-# Renombrar columnas
-resumen = resumen.rename(columns={
-    "VideoID": "CantidadShorts",
-    "Vistas": "VistasTotales",
-    "Likes": "LikesTotales",
-    "Comentarios": "ComentariosTotales"
-})
+    # Agrupar por canal y período
+    resumen = df_all.groupby(["CanalID", "Nombre", "Periodo"]).agg({
+        "VideoID": "count",
+        "Vistas": "sum",
+        "Likes": "sum",
+        "Comentarios": "sum"
+    }).reset_index()
 
-# Métricas derivadas
-resumen["VistasPromedio"] = resumen["VistasTotales"] / resumen["CantidadShorts"]
-resumen["EngagementRate"] = (resumen["LikesTotales"] + resumen["ComentariosTotales"]) / resumen["VistasTotales"]
+    resumen = resumen.rename(columns={
+        "VideoID": "CantidadShorts",
+        "Vistas": "VistasTotales",
+        "Likes": "LikesTotales",
+        "Comentarios": "ComentariosTotales"
+    })
 
-# Ordenar para calcular crecimiento
-resumen = resumen.sort_values(["CanalID", "Periodo"])
+    # Métricas derivadas
+    resumen["VistasPromedio"] = resumen["VistasTotales"] / resumen["CantidadShorts"]
+    resumen["EngagementRate"] = (
+        resumen["LikesTotales"] + resumen["ComentariosTotales"]
+    ) / resumen["VistasTotales"]
 
-# Guardar resumen como CSV
-resumen.to_csv(INPUT_DIR / "resumen_shorts.csv", index=False)
+    # Guardar CSV de resumen
+    resumen.to_csv(OUTPUT_CSV, index=False)
+    print(f"✅ CSV resumen guardado en {OUTPUT_CSV}")
 
-# Función de gráfico pastel
-def graficar_variable(df, variable, titulo, ylabel, filename):
-    plt.figure(figsize=(10, 6))
-    pastel_colors = sns.color_palette("pastel")
+    # Función genérica de gráfico de línea
+    def plot_line(data, y_col, title, ylabel, out_filename):
+        plt.figure(figsize=(10, 6))
+        for canal, grupo in data.groupby("Nombre"):
+            plt.plot(
+                grupo["Periodo"],
+                grupo[y_col],
+                marker="o",
+                label=canal
+            )
+        plt.title(title)
+        plt.xlabel("Periodo")
+        plt.ylabel(ylabel)
+        plt.xticks(rotation=45)
+        plt.grid(True, linestyle='--', alpha=0.3)
+        plt.legend(title="Canal", bbox_to_anchor=(1.05, 1), loc='upper left')
+        plt.tight_layout()
+        plt.savefig(GRAFICOS_DIR / out_filename)
+        plt.close()
 
-    sns.lineplot(
-        data=df,
-        x="Periodo",
-        y=variable,
-        hue="Nombre",
-        palette=pastel_colors,
-        marker="o"
-    )
+    # Generar gráficos
+    plot_line(resumen, "CantidadShorts", "Shorts publicados por mes", "Cantidad de Shorts", "cantidad_shorts.png")
+    plot_line(resumen, "VistasTotales", "Vistas totales por mes", "Vistas Totales", "vistas_totales.png")
+    plot_line(resumen, "VistasPromedio", "Vistas promedio por Short", "Vistas Promedio", "vistas_promedio.png")
+    plot_line(resumen, "EngagementRate", "Engagement rate por mes", "Engagement Rate (likes+comentarios / vistas)", "engagement_rate.png")
 
-    plt.title(titulo, fontsize=14)
-    plt.ylabel(ylabel)
-    plt.xlabel("Periodo")
-    plt.xticks(rotation=45)
-    plt.tight_layout()
-    plt.legend(title="Canal", bbox_to_anchor=(1.05, 1), loc='upper left')
-    plt.grid(True, linestyle='--', alpha=0.3)
-    plt.savefig(GRAFICOS_DIR / f"{filename}.png")
-    plt.close()
+    print(f"✅ Gráficos guardados en {GRAFICOS_DIR}")
 
-# Crear gráficos
-graficar_variable(resumen, "CantidadShorts", "Shorts publicados por mes", "Cantidad de Shorts", "cantidad_shorts")
-graficar_variable(resumen, "VistasTotales", "Vistas totales por mes", "Vistas", "vistas_totales")
-graficar_variable(resumen, "VistasPromedio", "Vistas promedio por Short", "Promedio de vistas", "vistas_promedio")
-graficar_variable(resumen, "EngagementRate", "Engagement rate por mes", "Engagement (likes+comentarios / vistas)", "engagement_rate")
 
-print("✅ Análisis longitudinal completado. Gráficos guardados en /data/shorts/graficos/")
+if __name__ == "__main__":
+    main()
+
 
