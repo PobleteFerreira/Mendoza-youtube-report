@@ -1,95 +1,75 @@
-```python
-#!/usr/bin/env python3
-"""
-Análisis longitudinal y gráficos de YouTube Shorts basados en los resúmenes mensuales generados por `shorts_analysis.py`.
+name: Monthly Shorts Graph Generation
 
-Requisitos:
-- Archivos CSV de resumen mensuales en `data/shorts_stats/shorts_summary_YYYY-MM.csv`.
-- Python 3.10+
-- Paquetes: pandas, matplotlib
+on:
+  schedule:
+    - cron: '0 4 3 * *'   # 04:00 UTC del día 3 de cada mes
+  workflow_dispatch:
 
-Salida:
-- CSV maestro: `data/shorts_stats/resumen_shorts.csv`
-- Gráficos en `data/shorts_stats/graficos/`:
-    - cantidad_shorts.png
-    - vistas_totales.png
-    - vistas_promedio.png
-    - engagement_rate.png
-"""
-import pandas as pd
-import matplotlib.pyplot as plt
-from pathlib import Path
+permissions:
+  contents: write
 
+jobs:
+  generate-graphs:
+    runs-on: ubuntu-latest
 
-def main():
-    # Rutas de entrada/salida
-    INPUT_DIR = Path("data/shorts_stats")
-    MASTER_CSV = INPUT_DIR / "resumen_shorts.csv"
-    GRAFICOS_DIR = INPUT_DIR / "graficos"
-    GRAFICOS_DIR.mkdir(parents=True, exist_ok=True)
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          persist-credentials: true
 
-    # Buscar archivos de resumen mensuales
-    archivos = sorted(INPUT_DIR.glob("shorts_summary_*.csv"))
-    if not archivos:
-        print(f"⚠️ No se encontraron archivos shorts_summary_*.csv en {INPUT_DIR}")
-        return
+      - name: Create output folders
+        run: |
+          mkdir -p data/shorts_stats
+          mkdir -p data/shorts_stats/graficos
 
-    # Leer y concatenar todos los archivos
-    df_list = []
-    for file in archivos:
-        periodo = file.stem.split("_")[2]  # shorts_summary_YYYY-MM
-        try:
-            df = pd.read_csv(file)
-            df["Periodo"] = pd.to_datetime(periodo, format="%Y-%m")
-            df_list.append(df)
-        except Exception as e:
-            print(f"⚠️ Error al leer {file.name}: {e}")
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
 
-    df_all = pd.concat(df_list, ignore_index=True)
-    if df_all.empty:
-        print("⚠️ No hay datos para analizar después de concatenar.")
-        return
+      - name: Install dependencies
+        run: |
+          pip install -r extractor/requirements.txt
+          pip install pandas matplotlib
 
-    # Calcular métricas derivadas
-    df_all["VistasPromedio"] = df_all["TotalVistas"] / df_all["CantidadShorts"].replace(0, pd.NA)
-    df_all["EngagementRate"] = (
-        (df_all["TotalLikes"] + df_all.get("ComentariosTotales", 0))
-        / df_all["TotalVistas"].replace(0, pd.NA)
-    )
+      - name: Run monthly Shorts extraction
+        env:
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+        run: python extractor/shorts_analysis.py
 
-    # Guardar CSV maestro
-    df_all.to_csv(MASTER_CSV, index=False)
-    print(f"✅ CSV maestro guardado en {MASTER_CSV}")
+      - name: Run longitudinal graphing
+        run: python extractor/shorts_growth_analysis.py
 
-    # Función para graficar
-    def plot_line(y_col, title, ylabel, filename):
-        plt.figure(figsize=(10, 6))
-        for canal, grupo in df_all.groupby("Nombre"):
-            plt.plot(
-                grupo["Periodo"],
-                grupo[y_col],
-                marker="o",
-                label=canal
-            )
-        plt.title(title)
-        plt.xlabel("Periodo")
-        plt.ylabel(ylabel)
-        plt.xticks(rotation=45)
-        plt.grid(True, linestyle="--", alpha=0.3)
-        plt.legend(title="Canal", bbox_to_anchor=(1.05, 1), loc='upper left')
-        plt.tight_layout()
-        plt.savefig(GRAFICOS_DIR / filename)
-        plt.close()
+      - name: Verify outputs
+        run: |
+          ls data/shorts_stats/resumen_shorts.csv   || echo "⚠️ resumen_shorts.csv missing"
+          ls data/shorts_stats/graficos/*.png       || echo "⚠️ No graphs generated"
 
-    # Generar gráficos
-    plot_line("CantidadShorts", "Shorts publicados por mes", "Cantidad de Shorts", "cantidad_shorts.png")
-    plot_line("TotalVistas", "Vistas totales por mes", "Vistas Totales", "vistas_totales.png")
-    plot_line("VistasPromedio", "Vistas promedio por Short", "Vistas Promedio", "vistas_promedio.png")
-    plot_line("EngagementRate", "Engagement rate por mes", "Engagement Rate (likes+comentarios/vistas)", "engagement_rate.png")
+      - name: Commit and Push results (robust)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
 
-    print(f"✅ Gráficos guardados en {GRAFICOS_DIR}")
+          FILES_ADDED=false
 
-if __name__ == "__main__":
-    main()
-```
+          if [ -f data/shorts_stats/resumen_shorts.csv ]; then
+            git add data/shorts_stats/resumen_shorts.csv
+            FILES_ADDED=true
+          fi
+
+          if ls data/shorts_stats/graficos/*.png 1> /dev/null 2>&1; then
+            git add data/shorts_stats/graficos/*.png
+            FILES_ADDED=true
+          fi
+
+          if [ "$FILES_ADDED" = "true" ]; then
+            git diff --cached --quiet || git commit -m "chore: update monthly shorts graphs (run ${{ github.run_id }})"
+            git push origin HEAD:main
+          else
+            echo "✅ Nothing to commit"
+          fi
 
