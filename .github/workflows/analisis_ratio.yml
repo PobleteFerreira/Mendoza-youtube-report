@@ -1,4 +1,3 @@
-```yaml
 name: "Analizar Ratio Mensual de Vivos"
 
 on:
@@ -52,5 +51,4 @@ jobs:
         if: ${{ failure() }}
         run: |
           echo "⚠️ Ha ocurrido un error durante el análisis. Revisa los logs para más detalles."
-```
 
