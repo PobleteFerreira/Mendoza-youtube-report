@@ -1,59 +1,54 @@
-import pandas as pd
-from pathlib import Path
+name: "Analizar Ratio Mensual de Vivos"
 
-# === Configuración de rutas ===
-CANAL_DIR = Path("data/canales")
-VIDEOS_ROOT = Path("data/videos")
-OUT_DIR = Path("data/informes")
-OUT_DIR.mkdir(parents=True, exist_ok=True)
+on:
+  push:
+    paths:
+      - 'extractor/analizador_ratio_mes.py'
+      - 'data/canales/**'
+      - 'data/videos/**'
+  workflow_dispatch: {}
 
-# === Seleccionar el reporte más reciente ===
-report_files = sorted(CANAL_DIR.glob('report_*.csv'))
-if not report_files:
-    raise FileNotFoundError("No se encontró ningún archivo report_*.csv en data/canales")
-summary_path = report_files[-1]
-month_year = summary_path.stem.replace('report_', '')
+jobs:
+  analisis_ratio:
+    name: Ejecutar Análisis de Ratio de Vivos
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout del repositorio
+        uses: actions/checkout@v3
 
-# === Leer y preparar resumen general ===
-df_summary = pd.read_csv(summary_path, encoding='utf-8')
-# Excluir Vorterix
-df_summary = df_summary[~df_summary['Nombre'].str.lower().eq('vorterix')]
-# Asegurar tipos numéricos
-df_summary['Suscriptores'] = pd.to_numeric(df_summary['Suscriptores'], errors='coerce').fillna(0).astype(int)
-df_summary['CantidadVivosMes'] = pd.to_numeric(df_summary['CantidadVivosMes'], errors='coerce').fillna(0).astype(int)
+      - name: 🐍 Configurar Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
 
-# === Acumular vistas de vivos y calcular ratio ===
-records = []
-for _, row in df_summary.iterrows():
-    canal_id = row['CanalID']
-    canal_nombre = row['Nombre']
-    subs = row['Suscriptores']
-    vivos_count = row['CantidadVivosMes']
+      - name: 🚀 Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-    # Sumar vistas de vivos del mes
-    view_sum = 0
-    canal_folder = VIDEOS_ROOT / f"canal_{canal_id}"
-    if canal_folder.exists():
-        for csv_file in canal_folder.glob(f'videos_{month_year}.csv'):
-            df_v = pd.read_csv(csv_file, usecols=['view_count'])
-            view_sum += pd.to_numeric(df_v['view_count'], errors='coerce').fillna(0).sum()
+      - name: 📂 Asegurar carpeta de salida
+        run: |
+          echo "Creando carpeta data/informes si no existe..."
+          mkdir -p data/informes
 
-    # Calcular ratio de vistas de vivos por suscriptor
-    ratio_vivos_subs = view_sum / subs if subs > 0 else 0
-    records.append({
-        'CanalID': canal_id,
-        'Nombre': canal_nombre,
-        'Suscriptores': subs,
-        'VistasVivos30': view_sum,
-        'CantidadVivos30': vivos_count,
-        'RatioVivosSubs': round(ratio_vivos_subs, 4)
-    })
+      - name: ▶️ Ejecutar script de análisis
+        env:
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+        run: |
+          set -euxo pipefail
+          echo "Iniciando análisis de ratio de vivos para el mes más reciente..."
+          python extractor/analizador_ratio_mes.py
+          echo "✅ Análisis finalizado con éxito."
 
-# === Crear tabla y exportar ===
-df_table = pd.DataFrame(records)
-df_table = df_table.sort_values('RatioVivosSubs', ascending=False)
-output_csv = OUT_DIR / f"tabla_vivos_ratio_{month_year}.csv"
-df_table.to_csv(output_csv, index=False)
-print(f"Tabla generada: {output_csv}")
-print(df_table)
+      - name: 📦 Subir reporte como artefacto
+        if: ${{ success() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: tabla-vivos-ratio
+          path: data/informes/tabla_vivos_ratio_*.csv
+
+      - name: ❌ Notificar error
+        if: ${{ failure() }}
+        run: |
+          echo "⚠️ Ha ocurrido un error durante el análisis. Revisa los logs para más detalles."
 
