@@ -1,3 +1,4 @@
+# .github/workflows/monthly-shorts-graphs.yml
 name: Monthly Shorts Graph Generation
 
 on:
@@ -35,6 +36,8 @@ jobs:
           pip install pandas matplotlib
 
       - name: ▶️ Run monthly Shorts extraction
+        env:
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
         run: python extractor/shorts_analysis.py
 
       - name: ▶️ Run longitudinal graphing
@@ -75,4 +78,3 @@ jobs:
           else
             echo "✅ Nothing to commit"
           fi
-
