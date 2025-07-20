@@ -1,9 +1,8 @@
 name: Monthly Shorts Graph Generation
 
-# Se ejecuta a las 04:00 UTC del día 3 de cada mes
 on:
   schedule:
-    - cron: '0 4 3 * *'
+    - cron: '0 4 3 * *'   # 04:00 UTC del día 3 de cada mes
   workflow_dispatch:
 
 permissions:
@@ -30,12 +29,13 @@ jobs:
           pip install pandas matplotlib
 
       - name: ▶️ Run longitudinal analysis & graphing
-        run: python extractor/shorts_longitudinal_analysis.py
+-        run: python extractor/shorts_longitudinal_analysis.py
++        run: python extractor/shorts_growth_analysis.py
 
       - name: 🕵️‍♂️ Verify outputs
         run: |
-          ls -l data/shorts/resumen_shorts.csv
-          ls -l data/shorts/graficos/*.png
+          ls -l data/shorts/resumen_shorts.csv || echo "⚠️ resumen_shorts.csv no existe"
+          ls -l data/shorts/graficos/*.png || echo "⚠️ no se encontraron gráficos"
 
       - name: 📄 Commit and Push graphs
         env:
@@ -46,3 +46,4 @@ jobs:
           git add data/shorts/resumen_shorts.csv data/shorts/graficos/*.png
           git diff --cached --quiet || git commit -m "chore: update monthly shorts graphs (run ${{ github.run_id }})"
           git push origin HEAD:main
+
