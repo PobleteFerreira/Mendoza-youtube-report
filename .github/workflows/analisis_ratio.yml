@@ -1,3 +1,4 @@
+```yaml
 name: "Analizar Ratio Mensual de Vivos"
 
 on:
@@ -41,13 +42,15 @@ jobs:
           echo "✅ Análisis finalizado con éxito."
 
       - name: 📦 Subir reporte como artefacto
-        if: success()
-        uses: actions/upload-artifact@v3
+        if: ${{ success() }}
+        uses: actions/upload-artifact@v4
         with:
           name: tabla-vivos-ratio
           path: data/informes/tabla_vivos_ratio_*.csv
 
       - name: ❌ Notificar error
-        if: failure()
+        if: ${{ failure() }}
         run: |
           echo "⚠️ Ha ocurrido un error durante el análisis. Revisa los logs para más detalles."
+```
+
