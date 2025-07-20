@@ -1,4 +1,3 @@
-# .github/workflows/monthly-shorts-graphs.yml
 name: Monthly Shorts Graph Generation
 
 on:
@@ -32,9 +31,7 @@ jobs:
 
       - name: 📦 Install dependencies
         run: |
-          # Dependencias de shorts_analysis.py
-          pip install -r extractor/requirements.txt
-          # Librerías para análisis longitudinal y gráficos
+          pip install requests python-dotenv isodate
           pip install pandas matplotlib
 
       - name: ▶️ Run monthly Shorts extraction
@@ -78,5 +75,4 @@ jobs:
           else
             echo "✅ Nothing to commit"
           fi
-
 
