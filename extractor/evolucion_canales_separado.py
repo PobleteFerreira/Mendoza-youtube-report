@@ -17,7 +17,8 @@ for file in csv_files:
     if not match:
         continue
     mes, anio = match.groups()
-    periodo = f"{anio}-{mes}"
+    fecha = datetime.strptime(f"{mes}-{anio}", "%m-%Y")
+    periodo = fecha.strftime("%b %y")  # Ej: Jul 25
     df = pd.read_csv(file)
     df['Periodo'] = periodo
     dataframes.append(df)
