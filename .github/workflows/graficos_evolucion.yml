@@ -1,0 +1,33 @@
+name: Generar gráficos de evolución por canal
+
+on:
+  schedule:
+    - cron: '30 6 2 * *'   # Segundo día de cada mes a las 6:30 UTC
+  workflow_dispatch:       # También se puede ejecutar manualmente
+
+jobs:
+  graficos-evolucion:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repositorio
+      uses: actions/checkout@v4
+
+    - name: Configurar Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Instalar dependencias
+      run: |
+        pip install --upgrade pip
+        pip install pandas matplotlib
+
+    - name: Ejecutar script de evolución
+      run: python extractor/evolucion_canales_separado.py
+
+    - name: Subir gráficos como artefactos
+      uses: actions/upload-artifact@v4
+      with:
+        name: graficos-evolucion-canales
+        path: data/canales/graficos/*.png
