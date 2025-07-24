@@ -26,8 +26,10 @@ jobs:
     - name: Ejecutar script de evolución
       run: python extractor/evolucion_canales_separado.py
 
-    - name: Subir gráficos como artefactos
-      uses: actions/upload-artifact@v4
-      with:
-        name: graficos-evolucion-canales
-        path: data/canales/graficos/*.png
+    - name: Hacer commit de los gráficos generados
+      run: |
+        git config --global user.email "bot@example.com"
+        git config --global user.name "GitHub Actions Bot"
+        git add data/canales/graficos/*.png
+        git commit -m "📊 Gráficos de evolución mensual actualizados" || echo "Nada para commitear"
+        git push
