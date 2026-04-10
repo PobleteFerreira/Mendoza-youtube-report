@@ -1,0 +1,84 @@
+name: 🔧 Migración — renombrar carpetas de canales
+
+on:
+  workflow_dispatch:
+
+jobs:
+  renombrar-carpetas:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Instalar dependencias
+        run: pip install pandas
+
+      - name: Renombrar carpetas
+        run: |
+          python3 << 'EOF'
+          import os, re, glob, shutil, pandas as pd
+
+          def slugify(name):
+              name = name.strip()
+              name = re.sub(r'[\\/:*?"<>|]', "_", name)
+              name = re.sub(r'\s+', "_", name)
+              name = re.sub(r'_+', "_", name)
+              return name.strip("_")
+
+          base_dir = os.path.join("data", "videos")
+          folders = [
+              f for f in os.listdir(base_dir)
+              if f.startswith("canal_") and os.path.isdir(os.path.join(base_dir, f))
+          ]
+
+          print(f"Carpetas encontradas: {len(folders)}\n")
+          renamed = 0
+
+          for folder in sorted(folders):
+              old_path = os.path.join(base_dir, folder)
+              csvs = glob.glob(os.path.join(old_path, "*.csv"))
+              if not csvs:
+                  print(f"  SKIP  {folder}  (sin CSVs)")
+                  continue
+              try:
+                  df = pd.read_csv(csvs[0], usecols=["channel_title"], nrows=1)
+                  channel_name = df["channel_title"].iloc[0]
+              except Exception as e:
+                  print(f"  SKIP  {folder}  (error: {e})")
+                  continue
+
+              slug = slugify(channel_name)
+              new_folder = f"canal_{slug}"
+              new_path = os.path.join(base_dir, new_folder)
+
+              if old_path == new_path:
+                  print(f"  OK    {folder}  (sin cambio)")
+                  continue
+              if os.path.exists(new_path):
+                  print(f"  SKIP  {folder}  → {new_folder}  (destino ya existe)")
+                  continue
+
+              print(f"  RENAME  {folder}  →  {new_folder}")
+              shutil.move(old_path, new_path)
+              renamed += 1
+
+          print(f"\nRenombradas: {renamed}")
+          EOF
+
+      - name: Commit y push
+        run: |
+          git config user.name "GitHub Actions Bot"
+          git config user.email "actions@github.com"
+          git add data/videos/
+          git diff --cached --quiet && echo "Sin cambios." || \
+            git commit -m "🔧 Renombrar carpetas de canal_ID a canal_Nombre"
+          git push
