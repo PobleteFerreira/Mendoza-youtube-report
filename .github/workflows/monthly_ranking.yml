@@ -1,0 +1,143 @@
+name: 📊 Rankings mensuales — videos y shorts
+
+on:
+  schedule:
+    # Día 2 de cada mes a las 10:00 AM hora Argentina (13:00 UTC)
+    - cron: "0 13 2 * *"
+  workflow_dispatch:
+
+jobs:
+  generar-rankings:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Instalar dependencias
+        run: pip install pandas
+
+      - name: Generar ranking de videos largos
+        run: |
+          python3 << 'EOF'
+          import pandas as pd, glob, os, re
+          from datetime import date, timedelta
+
+          def format_duration(seconds):
+              if pd.isna(seconds):
+                  return "—"
+              seconds = int(seconds)
+              h = seconds // 3600
+              m = (seconds % 3600) // 60
+              s = seconds % 60
+              if h > 0:
+                  return f"{h}:{m:02d}:{s:02d}"
+              return f"{m}:{s:02d}"
+
+          def format_views(n):
+              return f"{int(n):,}".replace(",", ".")
+
+          today = date.today()
+          first = today.replace(day=1)
+          mes = (first - timedelta(days=1))
+          month_str = mes.strftime("%m-%Y")
+          month_label = mes.strftime("%m/%Y")
+
+          pattern = f"data/videos/canal_*/top10_videos_{month_str}.csv"
+          files = glob.glob(pattern)
+          if not files:
+              print(f"No se encontraron archivos: {pattern}")
+              raise SystemExit(1)
+
+          df = pd.concat([pd.read_csv(f) for f in files], ignore_index=True)
+          df = df.drop_duplicates(subset="video_id")
+          top10 = df.nlargest(10, "view_count").reset_index(drop=True)
+
+          lines = []
+          lines.append(f"# 🏆 Top 10 videos más vistos — {month_label}\n")
+          lines.append(f"*Medición: 1° de {first.strftime('%m/%Y')} · Videos publicados en {month_label}*\n")
+          lines.append("")
+          lines.append("| # | Video | Canal | Duración | Visualizaciones |")
+          lines.append("|---|-------|-------|:--------:|----------------:|")
+          for i, row in top10.iterrows():
+              title = str(row["title"]).replace("|", "/")
+              channel = str(row["channel_title"]).strip().replace("|", "/")
+              duration = format_duration(row.get("duration_sec"))
+              views = format_views(row["view_count"])
+              lines.append(f"| {i+1} | {title} | {channel} | {duration} | {views} |")
+          lines.append("")
+          lines.append(f"*Generado automáticamente el {today.isoformat()}*")
+
+          os.makedirs("data/rankings", exist_ok=True)
+          with open(f"data/rankings/top10_videos_{month_str}.md", "w", encoding="utf-8") as f:
+              f.write("\n".join(lines))
+
+          print(f"Ranking de videos generado: data/rankings/top10_videos_{month_str}.md")
+          EOF
+
+      - name: Generar ranking de shorts
+        run: |
+          python3 << 'EOF'
+          import pandas as pd, glob, os, re
+          from datetime import date, timedelta
+
+          def format_views(n):
+              return f"{int(n):,}".replace(",", ".")
+
+          def clean_name(url):
+              m = re.search(r'@([^?/]+)', str(url))
+              return m.group(1) if m else str(url)
+
+          today = date.today()
+          first = today.replace(day=1)
+          mes = (first - timedelta(days=1))
+          month_str_dash = mes.strftime("%Y-%m")   # formato del archivo: 2026-03
+          month_label = mes.strftime("%m/%Y")
+
+          path = f"data/shorts_stats/shorts_details_{month_str_dash}.csv"
+          if not os.path.exists(path):
+              print(f"No se encontró el archivo: {path}")
+              raise SystemExit(1)
+
+          df = pd.read_csv(path)
+          df["canal"] = df["Nombre"].apply(clean_name)
+          top10 = df.nlargest(10, "Vistas").reset_index(drop=True)
+
+          lines = []
+          lines.append(f"# ⚡ Top 10 Shorts más vistos — {month_label}\n")
+          lines.append(f"*Medición: 1° de {first.strftime('%m/%Y')} · Shorts publicados en {month_label}*\n")
+          lines.append("")
+          lines.append("| # | Título | Canal | Visualizaciones |")
+          lines.append("|---|--------|-------|----------------:|")
+          for i, row in top10.iterrows():
+              title = str(row["Titulo"]).replace("|", "/")
+              canal = str(row["canal"]).replace("|", "/")
+              views = format_views(row["Vistas"])
+              lines.append(f"| {i+1} | {title} | {canal} | {views} |")
+          lines.append("")
+          lines.append(f"*Generado automáticamente el {today.isoformat()}*")
+
+          month_str_file = mes.strftime("%m-%Y")
+          os.makedirs("data/rankings", exist_ok=True)
+          with open(f"data/rankings/top10_shorts_{month_str_file}.md", "w", encoding="utf-8") as f:
+              f.write("\n".join(lines))
+
+          print(f"Ranking de shorts generado: data/rankings/top10_shorts_{month_str_file}.md")
+          EOF
+
+      - name: Commit y push
+        run: |
+          git config user.name "GitHub Actions Bot"
+          git config user.email "actions@github.com"
+          git add data/rankings/
+          git diff --cached --quiet && echo "Sin cambios." || \
+            git commit -m "📊 Rankings mensuales actualizados ($(date +'%m-%Y'))"
+          git push
