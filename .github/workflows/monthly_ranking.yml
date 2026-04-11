@@ -2,7 +2,6 @@ name: 📊 Rankings mensuales — videos y shorts
 
 on:
   schedule:
-    # Día 2 de cada mes a las 10:00 AM hora Argentina (13:00 UTC)
     - cron: "0 13 2 * *"
   workflow_dispatch:
 
@@ -25,10 +24,10 @@ jobs:
       - name: Instalar dependencias
         run: pip install pandas
 
-      - name: Generar ranking de videos largos
+      - name: Generar rankings de videos largos
         run: |
           python3 << 'EOF'
-          import pandas as pd, glob, os, re
+          import pandas as pd, glob, os
           from datetime import date, timedelta
 
           def format_duration(seconds):
@@ -45,11 +44,40 @@ jobs:
           def format_views(n):
               return f"{int(n):,}".replace(",", ".")
 
+          def generar_ranking(df, provincia, tipo, month_str, month_label, today, first):
+              filtro = df[(df["provincia"] == provincia) & (df["tipo"] == tipo)]
+              if filtro.empty:
+                  print(f"Sin datos videos para {provincia} - {tipo}")
+                  return
+              top10 = filtro.nlargest(10, "view_count").reset_index(drop=True)
+              slug = f"{provincia.lower().replace(' ', '_')}_{tipo}"
+              lines = []
+              lines.append(f"# 🏆 Top 10 videos — {provincia} {tipo} — {month_label}\n")
+              lines.append(f"*Medición: 1° de {first.strftime('%m/%Y')} · Videos publicados en {month_label}*\n")
+              lines.append("")
+              lines.append("| # | Video | Canal | Duración | Visualizaciones |")
+              lines.append("|---|-------|-------|:--------:|----------------:|")
+              for i, row in top10.iterrows():
+                  title = str(row["title"]).replace("|", "/")
+                  channel = str(row["channel_title"]).strip().replace("|", "/")
+                  duration = format_duration(row.get("duration_sec"))
+                  views = format_views(row["view_count"])
+                  lines.append(f"| {i+1} | {title} | {channel} | {duration} | {views} |")
+              lines.append("")
+              lines.append(f"*Generado automáticamente el {today.isoformat()}*")
+              os.makedirs("data/rankings", exist_ok=True)
+              path = f"data/rankings/top10_videos_{slug}_{month_str}.md"
+              with open(path, "w", encoding="utf-8") as f:
+                  f.write("\n".join(lines))
+              print(f"Generado: {path}")
+
           today = date.today()
           first = today.replace(day=1)
-          mes = (first - timedelta(days=1))
+          mes = first - timedelta(days=1)
           month_str = mes.strftime("%m-%Y")
           month_label = mes.strftime("%m/%Y")
+
+          channels = pd.read_csv("extractor/channels.csv")[["channel_id", "provincia", "tipo"]]
 
           pattern = f"data/videos/canal_*/top10_videos_{month_str}.csv"
           files = glob.glob(pattern)
@@ -59,34 +87,17 @@ jobs:
 
           df = pd.concat([pd.read_csv(f) for f in files], ignore_index=True)
           df = df.drop_duplicates(subset="video_id")
-          top10 = df.nlargest(10, "view_count").reset_index(drop=True)
+          df = df.merge(channels, on="channel_id", how="left")
 
-          lines = []
-          lines.append(f"# 🏆 Top 10 videos más vistos — {month_label}\n")
-          lines.append(f"*Medición: 1° de {first.strftime('%m/%Y')} · Videos publicados en {month_label}*\n")
-          lines.append("")
-          lines.append("| # | Video | Canal | Duración | Visualizaciones |")
-          lines.append("|---|-------|-------|:--------:|----------------:|")
-          for i, row in top10.iterrows():
-              title = str(row["title"]).replace("|", "/")
-              channel = str(row["channel_title"]).strip().replace("|", "/")
-              duration = format_duration(row.get("duration_sec"))
-              views = format_views(row["view_count"])
-              lines.append(f"| {i+1} | {title} | {channel} | {duration} | {views} |")
-          lines.append("")
-          lines.append(f"*Generado automáticamente el {today.isoformat()}*")
-
-          os.makedirs("data/rankings", exist_ok=True)
-          with open(f"data/rankings/top10_videos_{month_str}.md", "w", encoding="utf-8") as f:
-              f.write("\n".join(lines))
-
-          print(f"Ranking de videos generado: data/rankings/top10_videos_{month_str}.md")
+          for provincia in df["provincia"].dropna().unique():
+              for tipo in df["tipo"].dropna().unique():
+                  generar_ranking(df, provincia, tipo, month_str, month_label, today, first)
           EOF
 
-      - name: Generar ranking de shorts
+      - name: Generar rankings de shorts
         run: |
           python3 << 'EOF'
-          import pandas as pd, glob, os, re
+          import pandas as pd, os, re
           from datetime import date, timedelta
 
           def format_views(n):
@@ -96,41 +107,122 @@ jobs:
               m = re.search(r'@([^?/]+)', str(url))
               return m.group(1) if m else str(url)
 
+          def generar_ranking(df, provincia, tipo, month_str, month_label, today, first):
+              filtro = df[(df["provincia"] == provincia) & (df["tipo"] == tipo)]
+              if filtro.empty:
+                  print(f"Sin datos shorts para {provincia} - {tipo}")
+                  return
+              top10 = filtro.nlargest(10, "Vistas").reset_index(drop=True)
+              slug = f"{provincia.lower().replace(' ', '_')}_{tipo}"
+              lines = []
+              lines.append(f"# ⚡ Top 10 Shorts — {provincia} {tipo} — {month_label}\n")
+              lines.append(f"*Medición: 1° de {first.strftime('%m/%Y')} · Shorts publicados en {month_label}*\n")
+              lines.append("")
+              lines.append("| # | Título | Canal | Visualizaciones |")
+              lines.append("|---|--------|-------|----------------:|")
+              for i, row in top10.iterrows():
+                  title = str(row["Titulo"]).replace("|", "/")
+                  canal = str(row["canal"]).replace("|", "/")
+                  views = format_views(row["Vistas"])
+                  lines.append(f"| {i+1} | {title} | {canal} | {views} |")
+              lines.append("")
+              lines.append(f"*Generado automáticamente el {today.isoformat()}*")
+              os.makedirs("data/rankings", exist_ok=True)
+              path = f"data/rankings/top10_shorts_{slug}_{month_str}.md"
+              with open(path, "w", encoding="utf-8") as f:
+                  f.write("\n".join(lines))
+              print(f"Generado: {path}")
+
           today = date.today()
           first = today.replace(day=1)
-          mes = (first - timedelta(days=1))
-          month_str_dash = mes.strftime("%Y-%m")   # formato del archivo: 2026-03
+          mes = first - timedelta(days=1)
+          month_str_dash = mes.strftime("%Y-%m")
+          month_str = mes.strftime("%m-%Y")
           month_label = mes.strftime("%m/%Y")
+
+          channels = pd.read_csv("extractor/channels.csv")[["channel_id", "provincia", "tipo"]]
 
           path = f"data/shorts_stats/shorts_details_{month_str_dash}.csv"
           if not os.path.exists(path):
-              print(f"No se encontró el archivo: {path}")
+              print(f"No se encontró: {path}")
               raise SystemExit(1)
 
           df = pd.read_csv(path)
           df["canal"] = df["Nombre"].apply(clean_name)
-          top10 = df.nlargest(10, "Vistas").reset_index(drop=True)
+          df = df.rename(columns={"CanalID": "channel_id"})
+          df = df.merge(channels, on="channel_id", how="left")
 
-          lines = []
-          lines.append(f"# ⚡ Top 10 Shorts más vistos — {month_label}\n")
-          lines.append(f"*Medición: 1° de {first.strftime('%m/%Y')} · Shorts publicados en {month_label}*\n")
-          lines.append("")
-          lines.append("| # | Título | Canal | Visualizaciones |")
-          lines.append("|---|--------|-------|----------------:|")
-          for i, row in top10.iterrows():
-              title = str(row["Titulo"]).replace("|", "/")
-              canal = str(row["canal"]).replace("|", "/")
-              views = format_views(row["Vistas"])
-              lines.append(f"| {i+1} | {title} | {canal} | {views} |")
-          lines.append("")
-          lines.append(f"*Generado automáticamente el {today.isoformat()}*")
+          for provincia in df["provincia"].dropna().unique():
+              for tipo in df["tipo"].dropna().unique():
+                  generar_ranking(df, provincia, tipo, month_str, month_label, today, first)
+          EOF
 
-          month_str_file = mes.strftime("%m-%Y")
-          os.makedirs("data/rankings", exist_ok=True)
-          with open(f"data/rankings/top10_shorts_{month_str_file}.md", "w", encoding="utf-8") as f:
-              f.write("\n".join(lines))
+      - name: Generar rankings de vistas por canal (diferencia mensual)
+        run: |
+          python3 << 'EOF'
+          import pandas as pd, os
+          from datetime import date, timedelta
 
-          print(f"Ranking de shorts generado: data/rankings/top10_shorts_{month_str_file}.md")
+          def format_views(n):
+              return f"{int(n):,}".replace(",", ".")
+
+          def generar_ranking(df, provincia, tipo, month_str, month_label, today, first):
+              filtro = df[(df["provincia"] == provincia) & (df["tipo"] == tipo)]
+              if filtro.empty:
+                  print(f"Sin datos canales para {provincia} - {tipo}")
+                  return
+              top10 = filtro.nlargest(10, "vistas_mes").reset_index(drop=True)
+              slug = f"{provincia.lower().replace(' ', '_')}_{tipo}"
+              lines = []
+              lines.append(f"# 📺 Top 10 canales por vistas — {provincia} {tipo} — {month_label}\n")
+              lines.append(f"*Vistas generadas durante {month_label} (diferencia entre medición del 1° de {first.strftime('%m/%Y')} y 1° del mes anterior)*\n")
+              lines.append("")
+              lines.append("| # | Canal | Vistas en el mes |")
+              lines.append("|---|-------|----------------:|")
+              for i, row in top10.iterrows():
+                  canal = str(row["Nombre"]).strip().replace("|", "/")
+                  views = format_views(row["vistas_mes"])
+                  lines.append(f"| {i+1} | {canal} | {views} |")
+              lines.append("")
+              lines.append(f"*Generado automáticamente el {today.isoformat()}*")
+              os.makedirs("data/rankings", exist_ok=True)
+              path = f"data/rankings/top10_canales_{slug}_{month_str}.md"
+              with open(path, "w", encoding="utf-8") as f:
+                  f.write("\n".join(lines))
+              print(f"Generado: {path}")
+
+          today = date.today()
+          first = today.replace(day=1)
+          mes = first - timedelta(days=1)
+          mes_anterior = (mes.replace(day=1) - timedelta(days=1))
+          month_str = mes.strftime("%m-%Y")
+          month_label = mes.strftime("%m/%Y")
+          month_str_actual = mes.strftime("%m-%Y")
+          month_str_anterior = mes_anterior.strftime("%m-%Y")
+
+          path_actual = f"data/canales/report_{month_str_actual}.csv"
+          path_anterior = f"data/canales/report_{month_str_anterior}.csv"
+
+          if not os.path.exists(path_actual):
+              print(f"No se encontró: {path_actual}")
+              raise SystemExit(1)
+          if not os.path.exists(path_anterior):
+              print(f"No se encontró: {path_anterior}")
+              raise SystemExit(1)
+
+          channels = pd.read_csv("extractor/channels.csv")[["channel_id", "provincia", "tipo"]]
+
+          df_actual = pd.read_csv(path_actual)[["CanalID", "Nombre", "VistasTotales"]]
+          df_anterior = pd.read_csv(path_anterior)[["CanalID", "VistasTotales"]]
+
+          merged = df_actual.merge(df_anterior, on="CanalID", suffixes=("_actual", "_anterior"))
+          merged["vistas_mes"] = merged["VistasTotales_actual"] - merged["VistasTotales_anterior"]
+          merged = merged.rename(columns={"CanalID": "channel_id"})
+          merged = merged.merge(channels, on="channel_id", how="left")
+
+          for provincia in merged["provincia"].dropna().unique():
+              for tipo in merged["tipo"].dropna().unique():
+                  generar_ranking(merged, provincia, tipo, month_str, month_label, today, first)
           EOF
 
       - name: Commit y push
