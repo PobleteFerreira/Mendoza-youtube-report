@@ -24,22 +24,41 @@ def extraer_fecha(nombre_archivo):
     return None
 
 def procesar_datos():
-    archivos = glob.glob(RUTAS_REPORTES)
-    datos_mensuales = []
+    # Buscamos en la raíz directamente
+    archivos = glob.glob('report_*.csv')
+    
+    print(f"Archivos encontrados: {archivos}") # Esto saldrá en el log de GitHub
+    
+    if not archivos:
+        print("ERROR: No se encontró ningún archivo que empiece con 'report_' y termine en '.csv'")
+        return pd.DataFrame()
 
+    datos_mensuales = []
     for archivo in archivos:
         fecha = extraer_fecha(archivo)
         if fecha:
-            df = pd.read_csv(archivo)
-            # Sumamos la columna que me indicaste
-            vistas_totales = df['VistasTotales'].sum()
-            cantidad_canales = len(df)
-            
-            datos_mensuales.append({
-                'fecha': fecha,
-                'vistas_acumuladas': vistas_totales,
-                'cantidad_canales': cantidad_canales
-            })
+            try:
+                df = pd.read_csv(archivo)
+                # Verificamos si la columna existe antes de sumar
+                if 'VistasTotales' in df.columns:
+                    vistas_totales = df['VistasTotales'].sum()
+                    cantidad_canales = len(df)
+                    datos_mensuales.append({
+                        'fecha': fecha,
+                        'vistas_acumuladas': vistas_totales,
+                        'cantidad_canales': cantidad_canales
+                    })
+                else:
+                    print(f"Advertencia: El archivo {archivo} no tiene la columna 'VistasTotales'")
+            except Exception as e:
+                print(f"Error procesando {archivo}: {e}")
+
+    df_final = pd.DataFrame(datos_mensuales).sort_values('fecha')
+    if not df_final.empty:
+        df_final['vistas_mensuales'] = df_final['vistas_acumuladas'].diff().fillna(0)
+        df_final['nuevos_canales'] = df_final['cantidad_canales'].diff().fillna(0)
+    
+    return df_final
 
     # Ordenar por fecha cronológicamente
     df_final = pd.DataFrame(datos_mensuales).sort_values('fecha')
