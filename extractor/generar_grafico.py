@@ -8,8 +8,8 @@ from datetime import datetime
 # Configuramos las rutas para que funcionen desde la carpeta /extractor
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # '..' significa "subir un nivel" para encontrar la carpeta 'data'
+# Cambiá estas líneas en tu archivo .py:
 RUTAS_REPORTES = os.path.join(BASE_DIR, '..', 'data', 'canales', 'report_*.csv')
-# Guardamos el gráfico en la raíz del proyecto para que se vea en el README
 ARCHIVO_SALIDA_GRAFICO = os.path.join(BASE_DIR, '..', 'grafico_ecosistema_mendoza.png')
 
 def extraer_fecha(nombre_archivo):
