@@ -1,31 +1,26 @@
 name: Generar gráficos de evolución por canal
-
 on:
   schedule:
     - cron: '30 6 2 * *'   # Segundo día de cada mes a las 6:30 UTC
   workflow_dispatch:       # También se puede ejecutar manualmente
-
 jobs:
   graficos-evolucion:
     runs-on: ubuntu-latest
-
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true  # ← fix Node.js 20 deprecation
     steps:
     - name: Checkout repositorio
-      uses: actions/checkout@v4
-
+      uses: actions/checkout@v4.2.2  # ← actualizado
     - name: Configurar Python
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v5.6.0  # ← actualizado
       with:
         python-version: '3.11'
-
     - name: Instalar dependencias
       run: |
         pip install --upgrade pip
         pip install pandas matplotlib
-
     - name: Ejecutar script de evolución
       run: python extractor/evolucion_canales_separado.py
-
     - name: Hacer commit de los gráficos generados
       run: |
         git config --global user.email "bot@example.com"
