@@ -23,7 +23,9 @@ jobs:
 
       - name: Ejecutar visualizador
         # IMPORTANTE: Aquí agregamos 'extractor/' para que encuentre el archivo
-        run: python extractor/generar_grafico.py
+        run:
+          cd extractor
+          python extractor/generar_grafico.py
 
       - name: Guardar cambios
         run: |
