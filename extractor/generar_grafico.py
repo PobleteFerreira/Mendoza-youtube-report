@@ -6,7 +6,13 @@ import re
 from datetime import datetime
 
 # 1. Configuración de rutas y estilo
-RUTAS_REPORTES = 'data/canales/report_*.csv'
+# ... (inicio del script)
+import os
+
+# Usamos rutas absolutas basadas en la ubicación del script
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+RUTAS_REPORTES = os.path.join(BASE_DIR, 'data', 'canales', 'report_*.csv')
+# ...
 ARCHIVO_SALIDA_GRAFICO = 'grafico_ecosistema_mendoza.png'
 plt.style.use('default') # Fondo blanco por defecto
 
