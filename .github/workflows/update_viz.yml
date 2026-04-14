@@ -1,17 +1,19 @@
 name: Actualizar Grafico Ecosistema
 on:
   schedule:
-    - cron: '0 3 2 * *' # Se ejecuta el día 2 de cada mes
-  workflow_dispatch:   # Permite ejecución manual para pruebas
+    - cron: '0 3 2 * *' 
+  workflow_dispatch:   
 
 permissions:
-  contents: write      # Permiso obligatorio para guardar el gráfico en el repo
+  contents: write      
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Necesario para poder hacer el rebase correctamente
 
       - name: Configurar Python
         uses: actions/setup-python@v5
@@ -30,5 +32,8 @@ jobs:
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add grafico_ecosistema_mendoza.png
+          # Commitear solo si hay cambios, si no, continuar
           git commit -m "Reporte mensual automático" || echo "Sin cambios para commitear"
+          # Sincronizar con los cambios que hiciste vos manualmente
+          git pull --rebase origin main
           git push
