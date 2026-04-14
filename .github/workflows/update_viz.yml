@@ -1,0 +1,25 @@
+name: Actualizar Grafico Ecosistema
+on:
+  schedule:
+    - cron: '0 3 2 * *' # Día 2 de cada mes a las 03:00 AM
+  workflow_dispatch:   # Para que puedas apretar un botón y probarlo ahora
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Configurar Python
+        uses: actions/setup-python@v4
+        with: {python-version: '3.9'}
+      - name: Instalar dependencias
+        run: pip install pandas matplotlib
+      - name: Ejecutar visualizador
+        run: python generar_grafico.py
+      - name: Guardar cambios
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add grafico_ecosistema_mendoza.png evolucion_ecosistema.csv
+          git commit -m "Reporte mensual automático"
+          git push
