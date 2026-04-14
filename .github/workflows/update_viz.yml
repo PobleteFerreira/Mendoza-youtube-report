@@ -1,26 +1,34 @@
 name: Actualizar Grafico Ecosistema
 on:
   schedule:
-    - cron: '0 3 2 * *' 
-  workflow_dispatch:   
+    - cron: '0 3 2 * *' # Se ejecuta el día 2 de cada mes
+  workflow_dispatch:   # Esto permite que lo ejecutes manualmente para probar
+
+permissions:
+  contents: write      # Crucial para que el bot pueda guardar el gráfico en tu repo
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4  # Actualizado a v4
+      - uses: actions/checkout@v4
+      
       - name: Configurar Python
-        uses: actions/setup-python@v5 # Actualizado a v5
+        uses: actions/setup-python@v5
         with: 
           python-version: '3.11'
+          
       - name: Instalar dependencias
         run: pip install pandas matplotlib
+        
       - name: Ejecutar visualizador
         run: python generar_grafico.py
+        
       - name: Guardar cambios
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add grafico_ecosistema_mendoza.png
-          git commit -m "Reporte mensual automático" || echo "No hay cambios para commitear"
+          # El '|| echo' evita que el proceso falle si no hay datos nuevos
+          git commit -m "Reporte mensual automático" || echo "Sin cambios para commitear"
           git push
