@@ -74,13 +74,27 @@ def main():
     resumen_canales = []
 
     for canal in canales:
-        channel_id = canal['channel_id']
-        channel_url = canal.get('channel_url', f'https://www.youtube.com/channel/{channel_id}')
+        channel_id = canal.get('channel_id', '').strip()
+        channel_url = canal.get('channel_url', f'https://www.youtube.com/channel/{channel_id}').strip()
 
-        # Datos generales canal
-        channel_resp = youtube.channels().list(part='snippet,statistics', id=channel_id).execute()
-        if not channel_resp['items']:
+        # Validar que el channel_id no esté vacío (canales recién agregados sin ID)
+        if not channel_id:
+            nombre_csv = canal.get('nombre', canal.get('name', 'Sin nombre'))
+            print(f"⚠️  Canal sin ID en channels.csv: {nombre_csv} — saltando")
             continue
+
+        # Datos generales del canal
+        try:
+            channel_resp = youtube.channels().list(part='snippet,statistics', id=channel_id).execute()
+        except Exception as e:
+            print(f"❌ Error consultando canal {channel_id}: {e} — saltando")
+            continue
+
+        # Canal eliminado, suspendido o ID inválido
+        if not channel_resp.get('items'):
+            print(f"⚠️  Canal no encontrado en YouTube (eliminado o ID inválido): {channel_id} — saltando")
+            continue
+
         info = channel_resp['items'][0]
         snippet, stats = info['snippet'], info['statistics']
         desc = snippet.get('description', '')
@@ -121,7 +135,7 @@ def main():
             v_resp = youtube.videos().list(
                 part='snippet,statistics,liveStreamingDetails', id=v['video_id']
             ).execute()
-            if not v_resp['items']:
+            if not v_resp.get('items'):
                 continue
             d = v_resp['items'][0]
             snip, stats = d['snippet'], d['statistics']
